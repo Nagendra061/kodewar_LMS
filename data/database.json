@@ -119,49 +119,188 @@
   "attendance": [],
   "resources": [],
   "notifications": [],
-  "emailLogs": [
-    {
-      "id": "email-1793730889934-eromp",
-      "recipientEmail": "nagendra@kodewar.com",
-      "recipientName": "Nagendra",
-      "subject": "Your Account Credentials - Kodewar Digital Learn",
-      "template": "activation",
-      "deliveryStatus": "delivered",
-      "sentAt": "2026-11-03T18:34:49.934Z",
-      "deliveredAt": "2026-11-03T18:34:49.934Z"
-    },
-    {
-      "id": "email-1793730578582-p3v20",
-      "recipientEmail": "nagendrad@kodewar.com",
-      "recipientName": "Nagendrad",
-      "subject": "Password Updated Successfully",
-      "template": "password_reset",
-      "deliveryStatus": "sent",
-      "sentAt": "2026-11-03T18:29:38.582Z",
-      "deliveredAt": "2026-11-03T18:29:38.582Z"
-    },
-    {
-      "id": "email-1793730479888-tw7ly",
-      "recipientEmail": "nagendrad@kodewar.com",
-      "recipientName": "Nagendrad",
-      "subject": "Welcome to Kodewar Digital Learn - Activation Credentials",
-      "template": "activation",
-      "deliveryStatus": "delivered",
-      "sentAt": "2026-11-03T18:27:59.888Z",
-      "deliveredAt": "2026-11-03T18:27:59.888Z"
-    },
-    {
-      "id": "email-1793729876349-sfso0",
-      "recipientEmail": "nagendra@kodewar.com",
-      "recipientName": "Nagendra",
-      "subject": "Welcome to Kodewar Digital Learn - Activation Credentials",
-      "template": "activation",
-      "deliveryStatus": "delivered",
-      "sentAt": "2026-11-03T18:17:56.349Z",
-      "deliveredAt": "2026-11-03T18:17:56.349Z"
-    }
-  ],
+  "emailLogs": [],
   "auditLogs": [
+    {
+      "id": "audit-1793731587699-a5av8",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "MEETING_DELETED",
+      "entityType": "meeting",
+      "entityId": "meet-1793731196726",
+      "summary": "Meeting session \"Basics\" on 2026-11-03 deleted by administrator.",
+      "timestamp": "2026-11-03T18:46:27.699Z"
+    },
+    {
+      "id": "audit-1793731580578-vwym1",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "MEETING_COMPLETED",
+      "entityType": "meeting",
+      "entityId": "meet-1793731196726",
+      "summary": "Session \"Basics\" marked as completed.",
+      "timestamp": "2026-11-03T18:46:20.578Z"
+    },
+    {
+      "id": "audit-1793731549081-z2aq2",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "NOTIFICATION_DELETED",
+      "entityType": "notification",
+      "entityId": "notif-1793731196727-cand-1793730479888",
+      "summary": "Notification \"New Session Scheduled: Basics\" deleted.",
+      "timestamp": "2026-11-03T18:45:49.081Z"
+    },
+    {
+      "id": "audit-1793731546597-u39xk",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "NOTIFICATION_DELETED",
+      "entityType": "notification",
+      "entityId": "notif-1793731399738-cand-1793730479888",
+      "summary": "Notification \"Meeting Access Live: Basics\" deleted.",
+      "timestamp": "2026-11-03T18:45:46.597Z"
+    },
+    {
+      "id": "audit-1793731542448-m3rvr",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "EMAIL_LOG_DELETED",
+      "entityType": "email_log",
+      "entityId": "email-1793729876349-sfso0",
+      "summary": "Deleted transactional email log to nagendra@kodewar.com (Welcome to Kodewar Digital Learn - Activation Credentials).",
+      "timestamp": "2026-11-03T18:45:42.448Z"
+    },
+    {
+      "id": "audit-1793731539612-u1jid",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "EMAIL_LOG_DELETED",
+      "entityType": "email_log",
+      "entityId": "email-1793730479888-tw7ly",
+      "summary": "Deleted transactional email log to nagendrad@kodewar.com (Welcome to Kodewar Digital Learn - Activation Credentials).",
+      "timestamp": "2026-11-03T18:45:39.612Z"
+    },
+    {
+      "id": "audit-1793731534988-j9b4k",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "EMAIL_LOG_DELETED",
+      "entityType": "email_log",
+      "entityId": "email-1793730578582-p3v20",
+      "summary": "Deleted transactional email log to nagendrad@kodewar.com (Password Updated Successfully).",
+      "timestamp": "2026-11-03T18:45:34.988Z"
+    },
+    {
+      "id": "audit-1793731532264-35r3j",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "EMAIL_LOG_DELETED",
+      "entityType": "email_log",
+      "entityId": "email-1793730889934-eromp",
+      "summary": "Deleted transactional email log to nagendra@kodewar.com (Your Account Credentials - Kodewar Digital Learn).",
+      "timestamp": "2026-11-03T18:45:32.264Z"
+    },
+    {
+      "id": "audit-1793731529317-5jgdl",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "EMAIL_LOG_DELETED",
+      "entityType": "email_log",
+      "entityId": "email-1793731196727-ndl7l",
+      "summary": "Deleted transactional email log to nagendrad@kodewar.com (New Session Scheduled: Basics).",
+      "timestamp": "2026-11-03T18:45:29.317Z"
+    },
+    {
+      "id": "audit-1793731499304-g1uiv",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "MEETING_ACCESS_DISABLED",
+      "entityType": "meeting",
+      "entityId": "meet-1793731196726",
+      "summary": "Meeting access DISABLED for \"Basics\".",
+      "timestamp": "2026-11-03T18:44:59.304Z"
+    },
+    {
+      "id": "audit-1793731483467-e84h7",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "ATTENDANCE_MARKED",
+      "entityType": "meeting",
+      "entityId": "meet-1793731196726",
+      "summary": "Recorded attendance for 2 candidates in \"Basics\".",
+      "timestamp": "2026-11-03T18:44:43.467Z"
+    },
+    {
+      "id": "audit-1793731447882-gh9rw",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "ADMIN_LOGIN",
+      "entityType": "auth",
+      "entityId": "admin-1",
+      "summary": "Super Admin logged in successfully.",
+      "timestamp": "2026-11-03T18:44:07.882Z"
+    },
+    {
+      "id": "audit-1793731412183-inr81",
+      "actorEmail": "nagendrad@kodewar.com",
+      "actorRole": "candidate",
+      "action": "CANDIDATE_LOGIN",
+      "entityType": "candidate",
+      "entityId": "cand-1793730479888",
+      "summary": "Candidate Nagendrad (KDL-2026-002) logged in.",
+      "timestamp": "2026-11-03T18:43:32.183Z"
+    },
+    {
+      "id": "audit-1793731399738-fvnus",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "MEETING_ACCESS_ENABLED",
+      "entityType": "meeting",
+      "entityId": "meet-1793731196726",
+      "summary": "Meeting access ENABLED for \"Basics\".",
+      "timestamp": "2026-11-03T18:43:19.738Z"
+    },
+    {
+      "id": "audit-1793731394957-flx8m",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "ADMIN_LOGIN",
+      "entityType": "auth",
+      "entityId": "admin-1",
+      "summary": "Super Admin logged in successfully.",
+      "timestamp": "2026-11-03T18:43:14.957Z"
+    },
+    {
+      "id": "audit-1793731280277-y4rjj",
+      "actorEmail": "nagendrad@kodewar.com",
+      "actorRole": "candidate",
+      "action": "CANDIDATE_LOGIN",
+      "entityType": "candidate",
+      "entityId": "cand-1793730479888",
+      "summary": "Candidate Nagendrad (KDL-2026-002) logged in.",
+      "timestamp": "2026-11-03T18:41:20.277Z"
+    },
+    {
+      "id": "audit-1793731257100-upks5",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "ADMIN_LOGIN",
+      "entityType": "auth",
+      "entityId": "admin-1",
+      "summary": "Super Admin logged in successfully.",
+      "timestamp": "2026-11-03T18:40:57.100Z"
+    },
+    {
+      "id": "audit-1793731196728-26lgq",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "MEETING_SCHEDULED",
+      "entityType": "meeting",
+      "entityId": "meet-1793731196726",
+      "summary": "Scheduled session \"Basics\" for batch Morning Batch on 2026-11-03 (00:13 - 00:18).",
+      "timestamp": "2026-11-03T18:39:56.728Z"
+    },
     {
       "id": "audit-1793730889936-w6xqq",
       "actorEmail": "admin@kodewar.com",
