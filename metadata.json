@@ -1,0 +1,7 @@
+{
+  "name": "Kodewar Digital Learn",
+  "description": "Single-company digital learning and candidate management platform with Admin and Candidate portals, meeting scheduler, attendance, and learning resources.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+

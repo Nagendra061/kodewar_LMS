@@ -1,0 +1,556 @@
+{
+  "admin": {
+    "id": "admin-1",
+    "email": "admin@kodewar.com",
+    "name": "Super Admin",
+    "role": "admin",
+    "passwordHash": "f63e21d4b0af7c1915d6e311294b9d69d4e6314762c5b68175478a2350923047739e4302bf9ecb61bc2e9a5d3bfabb86d9686fe09f3529e3aed7f8ef3d8fbc25",
+    "salt": "3d1b774373f40626105f781dcd991cd7"
+  },
+  "candidates": [],
+  "courses": [],
+  "batches": [],
+  "tutors": [],
+  "candidateBatchAssignments": [],
+  "meetingSeries": [],
+  "meetingSessions": [],
+  "attendance": [],
+  "resources": [],
+  "notifications": [],
+  "emailLogs": [],
+  "auditLogs": [
+    {
+      "id": "audit-1793724315953-l446b",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "COURSE_DELETED",
+      "entityType": "course",
+      "entityId": "crs-test-1",
+      "summary": "Test course deleted",
+      "timestamp": "2026-11-03T16:45:15.953Z"
+    },
+    {
+      "id": "audit-1793724315948-re52y",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "COURSE_UPDATED",
+      "entityType": "course",
+      "entityId": "crs-test-1",
+      "summary": "Test course updated",
+      "timestamp": "2026-11-03T16:45:15.948Z"
+    },
+    {
+      "id": "audit-1793724315944-gsce2",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "COURSE_CREATED",
+      "entityType": "course",
+      "entityId": "crs-test-1",
+      "summary": "Test course created",
+      "timestamp": "2026-11-03T16:45:15.944Z"
+    },
+    {
+      "id": "audit-1793722609302-ox7yc",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "ADMIN_LOGIN",
+      "entityType": "auth",
+      "entityId": "admin-1",
+      "summary": "Super Admin logged in successfully.",
+      "timestamp": "2026-11-03T16:16:49.302Z"
+    },
+    {
+      "id": "audit-1793719047018-to5jo",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "ADMIN_LOGIN",
+      "entityType": "auth",
+      "entityId": "admin-1",
+      "summary": "Super Admin logged in successfully.",
+      "timestamp": "2026-11-03T15:17:27.018Z"
+    },
+    {
+      "id": "audit-1793716182566-w5r0x",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "ADMIN_LOGIN",
+      "entityType": "auth",
+      "entityId": "admin-1",
+      "summary": "Super Admin logged in successfully.",
+      "timestamp": "2026-11-03T14:29:42.566Z"
+    },
+    {
+      "id": "audit-1793716161901-iy1dp",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "EMAIL_LOG_DELETED",
+      "entityType": "email_log",
+      "entityId": "email-1793716161870-fr35u",
+      "summary": "Deleted transactional email log to candidate.test@example.com (Account Activation Link (Resolved)).",
+      "timestamp": "2026-11-03T14:29:21.902Z"
+    },
+    {
+      "id": "audit-1793716161882-d2mvz",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "EMAIL_LOG_UPDATED",
+      "entityType": "email_log",
+      "entityId": "email-1793716161870-fr35u",
+      "summary": "Updated email log for candidate.test@example.com (Account Activation Link (Resolved)).",
+      "timestamp": "2026-11-03T14:29:21.883Z"
+    },
+    {
+      "id": "audit-1793716161870-2z6nm",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "EMAIL_LOG_CREATED",
+      "entityType": "email_log",
+      "entityId": "email-1793716161870-fr35u",
+      "summary": "Dispatched transactional email to candidate.test@example.com (Account Activation Link).",
+      "timestamp": "2026-11-03T14:29:21.870Z"
+    },
+    {
+      "id": "audit-1793716161831-unira",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "ADMIN_LOGIN",
+      "entityType": "auth",
+      "entityId": "admin-1",
+      "summary": "Super Admin logged in successfully.",
+      "timestamp": "2026-11-03T14:29:21.831Z"
+    },
+    {
+      "id": "audit-1793714985476-x0fkx",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "COURSE_DELETED",
+      "entityType": "course",
+      "entityId": "crs-1793714985353",
+      "summary": "Course Updated CRUD Course (CRUD-101) deleted by administrator.",
+      "timestamp": "2026-11-03T14:09:45.476Z"
+    },
+    {
+      "id": "audit-1793714985474-0sfo9",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "BATCH_DELETED",
+      "entityType": "batch",
+      "entityId": "batch-1793714985362",
+      "summary": "Batch Updated CRUD Batch 1 (CRUD-B1) deleted by administrator.",
+      "timestamp": "2026-11-03T14:09:45.474Z"
+    },
+    {
+      "id": "audit-1793714985471-621co",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "TUTOR_DELETED",
+      "entityType": "tutor",
+      "entityId": "tut-1793714985376",
+      "summary": "Tutor Dr. Crud Tutor (TUT-101) deleted.",
+      "timestamp": "2026-11-03T14:09:45.471Z"
+    },
+    {
+      "id": "audit-1793714985469-btpc4",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "MEETING_DELETED",
+      "entityType": "meeting",
+      "entityId": "meet-1793714985448",
+      "summary": "Meeting session \"CRUD Live Session\" on 2026-12-01 deleted by administrator.",
+      "timestamp": "2026-11-03T14:09:45.469Z"
+    },
+    {
+      "id": "audit-1793714985467-lrwuy",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "CANDIDATE_DELETED",
+      "entityType": "candidate",
+      "entityId": "cand-1793714985434",
+      "summary": "Candidate Alice M. Crud (KDL-2026-001) deleted.",
+      "timestamp": "2026-11-03T14:09:45.467Z"
+    },
+    {
+      "id": "audit-1793714985465-jr5cq",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "RESOURCE_DELETED",
+      "entityType": "resource",
+      "entityId": "res-1793714985462",
+      "summary": "Resource \"CRUD Notes\" deleted.",
+      "timestamp": "2026-11-03T14:09:45.465Z"
+    },
+    {
+      "id": "audit-1793714985463-hw78f",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "RESOURCE_PUBLISHED",
+      "entityType": "resource",
+      "entityId": "res-1793714985462",
+      "summary": "Published resource \"CRUD Notes\" (Lecture Notes) for batch audience.",
+      "timestamp": "2026-11-03T14:09:45.463Z"
+    },
+    {
+      "id": "audit-1793714985460-rkcpv",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "NOTIFICATION_DELETED",
+      "entityType": "notification",
+      "entityId": "notif-1793714985457",
+      "summary": "Notification \"Test Announcement\" deleted.",
+      "timestamp": "2026-11-03T14:09:45.460Z"
+    },
+    {
+      "id": "audit-1793714985457-brhz3",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "ANNOUNCEMENT_PUBLISHED",
+      "entityType": "notification",
+      "entityId": "notif-1793714985457",
+      "summary": "Announcement \"Test Announcement\" posted to all audience (0 candidates).",
+      "timestamp": "2026-11-03T14:09:45.457Z"
+    },
+    {
+      "id": "audit-1793714985454-1xw0q",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "ATTENDANCE_MARKED",
+      "entityType": "meeting",
+      "entityId": "meet-1793714985448",
+      "summary": "Recorded attendance for 1 candidates in \"CRUD Live Session\".",
+      "timestamp": "2026-11-03T14:09:45.454Z"
+    },
+    {
+      "id": "audit-1793714985451-r37u9",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "MEETING_ACCESS_ENABLED",
+      "entityType": "meeting",
+      "entityId": "meet-1793714985448",
+      "summary": "Meeting access ENABLED for \"CRUD Live Session\".",
+      "timestamp": "2026-11-03T14:09:45.451Z"
+    },
+    {
+      "id": "audit-1793714985448-ypd46",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "MEETING_SCHEDULED",
+      "entityType": "meeting",
+      "entityId": "meet-1793714985448",
+      "summary": "Scheduled session \"CRUD Live Session\" for batch Updated CRUD Batch 1 on 2026-12-01 (10:00 - 11:00).",
+      "timestamp": "2026-11-03T14:09:45.448Z"
+    },
+    {
+      "id": "audit-1793714985442-z7nje",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "CANDIDATE_UPDATED",
+      "entityType": "candidate",
+      "entityId": "cand-1793714985434",
+      "summary": "Candidate Alice M. Crud (KDL-2026-001) details updated.",
+      "timestamp": "2026-11-03T14:09:45.442Z"
+    },
+    {
+      "id": "audit-1793714985436-qk6rc",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "CANDIDATE_CREATED",
+      "entityType": "candidate",
+      "entityId": "cand-1793714985434",
+      "summary": "Candidate Alice Crud (KDL-2026-001) created in Updated CRUD Batch 1.",
+      "timestamp": "2026-11-03T14:09:45.436Z"
+    },
+    {
+      "id": "audit-1793714985428-xu2as",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "TUTOR_UPDATED",
+      "entityType": "tutor",
+      "entityId": "tut-1793714985376",
+      "summary": "Tutor Dr. Crud Tutor updated.",
+      "timestamp": "2026-11-03T14:09:45.428Z"
+    },
+    {
+      "id": "audit-1793714985377-myqp9",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "TUTOR_CREATED",
+      "entityType": "tutor",
+      "entityId": "tut-1793714985376",
+      "summary": "Tutor Dr. Crud Tutor (TUT-101) created.",
+      "timestamp": "2026-11-03T14:09:45.377Z"
+    },
+    {
+      "id": "audit-1793714985370-ugmvi",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "BATCH_UPDATED",
+      "entityType": "batch",
+      "entityId": "batch-1793714985362",
+      "summary": "Batch CRUD-B1 updated.",
+      "timestamp": "2026-11-03T14:09:45.370Z"
+    },
+    {
+      "id": "audit-1793714985362-i1ezo",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "BATCH_CREATED",
+      "entityType": "batch",
+      "entityId": "batch-1793714985362",
+      "summary": "Batch CRUD Batch 1 (CRUD-B1) created under Updated CRUD Course.",
+      "timestamp": "2026-11-03T14:09:45.362Z"
+    },
+    {
+      "id": "audit-1793714985358-zh1mr",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "COURSE_UPDATED",
+      "entityType": "course",
+      "entityId": "crs-1793714985353",
+      "summary": "Course CRUD-101 updated.",
+      "timestamp": "2026-11-03T14:09:45.358Z"
+    },
+    {
+      "id": "audit-1793714985353-f49fn",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "COURSE_CREATED",
+      "entityType": "course",
+      "entityId": "crs-1793714985353",
+      "summary": "Course CRUD Test Course (CRUD-101) created.",
+      "timestamp": "2026-11-03T14:09:45.353Z"
+    },
+    {
+      "id": "audit-1793714985335-r0l4y",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "ADMIN_LOGIN",
+      "entityType": "auth",
+      "entityId": "admin-1",
+      "summary": "Super Admin logged in successfully.",
+      "timestamp": "2026-11-03T14:09:45.335Z"
+    },
+    {
+      "id": "audit-1793711245434-xqzs2",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "COURSE_DELETED",
+      "entityType": "course",
+      "entityId": "crs-1793711245408",
+      "summary": "Course Course To Be Deleted (TEST-DEL) deleted by administrator.",
+      "timestamp": "2026-11-03T13:07:25.434Z"
+    },
+    {
+      "id": "audit-1793711245408-bd8dz",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "COURSE_CREATED",
+      "entityType": "course",
+      "entityId": "crs-1793711245408",
+      "summary": "Course Course To Be Deleted (TEST-DEL) created.",
+      "timestamp": "2026-11-03T13:07:25.408Z"
+    },
+    {
+      "id": "audit-1793711245389-sggm0",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "ADMIN_LOGIN",
+      "entityType": "auth",
+      "entityId": "admin-1",
+      "summary": "Super Admin logged in successfully.",
+      "timestamp": "2026-11-03T13:07:25.389Z"
+    },
+    {
+      "id": "audit-1793711238393-egdmd",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "ADMIN_LOGIN",
+      "entityType": "auth",
+      "entityId": "admin-1",
+      "summary": "Super Admin logged in successfully.",
+      "timestamp": "2026-11-03T13:07:18.393Z"
+    },
+    {
+      "id": "audit-1793711204276-0o0iu",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "COURSE_DELETED",
+      "entityType": "course",
+      "entityId": "crs-1793711138654",
+      "summary": "Course Candidate Protected Course (CAND-TEST) deleted by administrator.",
+      "timestamp": "2026-11-03T13:06:44.276Z"
+    },
+    {
+      "id": "audit-1793711204195-1iel1",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "ADMIN_LOGIN",
+      "entityType": "auth",
+      "entityId": "admin-1",
+      "summary": "Super Admin logged in successfully.",
+      "timestamp": "2026-11-03T13:06:44.195Z"
+    },
+    {
+      "id": "audit-1793711194918-mlf0j",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "ADMIN_LOGIN",
+      "entityType": "auth",
+      "entityId": "admin-1",
+      "summary": "Super Admin logged in successfully.",
+      "timestamp": "2026-11-03T13:06:34.918Z"
+    },
+    {
+      "id": "audit-1793711143666-sqhis",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "ADMIN_LOGIN",
+      "entityType": "auth",
+      "entityId": "admin-1",
+      "summary": "Super Admin logged in successfully.",
+      "timestamp": "2026-11-03T13:05:43.666Z"
+    },
+    {
+      "id": "audit-1793711138704-u43ob",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "CANDIDATE_CREATED",
+      "entityType": "candidate",
+      "entityId": "cand-1793711138702",
+      "summary": "Candidate Safety Check User (KDL-2026-001) created in Candidate Batch 1.",
+      "timestamp": "2026-11-03T13:05:38.704Z"
+    },
+    {
+      "id": "audit-1793711138679-zixq7",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "BATCH_CREATED",
+      "entityType": "batch",
+      "entityId": "batch-1793711138678",
+      "summary": "Batch Candidate Batch 1 (CP-B1) created under Candidate Protected Course.",
+      "timestamp": "2026-11-03T13:05:38.679Z"
+    },
+    {
+      "id": "audit-1793711138654-szl0m",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "COURSE_CREATED",
+      "entityType": "course",
+      "entityId": "crs-1793711138654",
+      "summary": "Course Candidate Protected Course (CAND-TEST) created.",
+      "timestamp": "2026-11-03T13:05:38.654Z"
+    },
+    {
+      "id": "audit-1793711138636-xz7g8",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "ADMIN_LOGIN",
+      "entityType": "auth",
+      "entityId": "admin-1",
+      "summary": "Super Admin logged in successfully.",
+      "timestamp": "2026-11-03T13:05:38.636Z"
+    },
+    {
+      "id": "audit-1793711130246-rr19g",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "COURSE_DELETED",
+      "entityType": "course",
+      "entityId": "crs-1793711130189",
+      "summary": "Course Cascade Test Course (CASCADE-TEST) deleted by administrator.",
+      "timestamp": "2026-11-03T13:05:30.246Z"
+    },
+    {
+      "id": "audit-1793711130211-1kz4i",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "BATCH_CREATED",
+      "entityType": "batch",
+      "entityId": "batch-1793711130211",
+      "summary": "Batch Cascade Batch 1 (CAS-B1) created under Cascade Test Course.",
+      "timestamp": "2026-11-03T13:05:30.211Z"
+    },
+    {
+      "id": "audit-1793711130189-exh3j",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "COURSE_CREATED",
+      "entityType": "course",
+      "entityId": "crs-1793711130189",
+      "summary": "Course Cascade Test Course (CASCADE-TEST) created.",
+      "timestamp": "2026-11-03T13:05:30.189Z"
+    },
+    {
+      "id": "audit-1793711130171-919ru",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "ADMIN_LOGIN",
+      "entityType": "auth",
+      "entityId": "admin-1",
+      "summary": "Super Admin logged in successfully.",
+      "timestamp": "2026-11-03T13:05:30.171Z"
+    },
+    {
+      "id": "audit-1793711123366-cftxw",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "COURSE_DELETED",
+      "entityType": "course",
+      "entityId": "crs-1793711123339",
+      "summary": "Course Temporary Test Course (TEST-999) deleted by administrator.",
+      "timestamp": "2026-11-03T13:05:23.366Z"
+    },
+    {
+      "id": "audit-1793711123339-wv59q",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "COURSE_CREATED",
+      "entityType": "course",
+      "entityId": "crs-1793711123339",
+      "summary": "Course Temporary Test Course (TEST-999) created.",
+      "timestamp": "2026-11-03T13:05:23.339Z"
+    },
+    {
+      "id": "audit-1793711123313-rfbze",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "ADMIN_LOGIN",
+      "entityType": "auth",
+      "entityId": "admin-1",
+      "summary": "Super Admin logged in successfully.",
+      "timestamp": "2026-11-03T13:05:23.313Z"
+    },
+    {
+      "id": "audit-1793710635245-8d4pw",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "ADMIN_LOGIN",
+      "entityType": "auth",
+      "entityId": "admin-1",
+      "summary": "Super Admin logged in successfully.",
+      "timestamp": "2026-11-03T12:57:15.245Z"
+    },
+    {
+      "id": "audit-1793710629324-l1bfu",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "ADMIN_LOGIN",
+      "entityType": "auth",
+      "entityId": "admin-1",
+      "summary": "Super Admin logged in successfully.",
+      "timestamp": "2026-11-03T12:57:09.324Z"
+    }
+  ],
+  "settings": {
+    "companyName": "Kodewar Digital Learn",
+    "companyTimezone": "Asia/Kolkata",
+    "lateCountsAsAttended": true,
+    "excludeExcusedFromDenominator": true,
+    "emailNotificationsEnabled": true,
+    "autoEmailReminders": true,
+    "defaultReminderOffsets": [
+      15,
+      60
+    ],
+    "maxFileUploadSizeMb": 25
+  }
+}
