@@ -20,6 +20,16 @@
   "emailLogs": [],
   "auditLogs": [
     {
+      "id": "audit-1793728856016-fk2wc",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "ADMIN_LOGIN",
+      "entityType": "auth",
+      "entityId": "admin-1",
+      "summary": "Super Admin logged in successfully.",
+      "timestamp": "2026-11-03T18:00:56.017Z"
+    },
+    {
       "id": "audit-1793724315953-l446b",
       "actorEmail": "admin@kodewar.com",
       "actorRole": "admin",
