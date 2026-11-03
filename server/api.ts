@@ -1,8 +1,9 @@
-import { Router, Response } from 'express';
+import { Router } from 'express';
+import type { Response } from 'express';
 import crypto from 'crypto';
 import { dbManager, hashPassword } from './db.ts';
+import type { AuthenticatedRequest } from './auth.ts';
 import {
-  AuthenticatedRequest,
   generateToken,
   revokeToken,
   requireAuth,

@@ -35,7 +35,9 @@ export interface DatabaseSchema {
   settings: SystemSettings;
 }
 
-const DATA_DIR = path.resolve(process.cwd(), 'data');
+const IS_VERCEL = !!process.env.VERCEL;
+const BUNDLED_DATA_DIR = path.resolve(process.cwd(), 'data');
+const DATA_DIR = IS_VERCEL ? path.resolve('/tmp', 'kodewar-data') : BUNDLED_DATA_DIR;
 const DB_FILE = path.resolve(DATA_DIR, 'database.json');
 const DB_BACKUP_FILE = path.resolve(DATA_DIR, 'database.backup.json');
 
@@ -106,7 +108,23 @@ class DatabaseManager {
     if (this.db) return this.db;
 
     if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
+      try {
+        fs.mkdirSync(DATA_DIR, { recursive: true });
+      } catch (err) {
+        console.error('Failed to create DATA_DIR:', err);
+      }
+    }
+
+    // On Vercel, copy initial database from repository if not yet in /tmp
+    if (IS_VERCEL && !fs.existsSync(DB_FILE)) {
+      const bundledDb = path.resolve(BUNDLED_DATA_DIR, 'database.json');
+      if (fs.existsSync(bundledDb)) {
+        try {
+          fs.copyFileSync(bundledDb, DB_FILE);
+        } catch (e) {
+          console.warn('Could not copy bundled database to /tmp:', e);
+        }
+      }
     }
 
     if (fs.existsSync(DB_FILE)) {

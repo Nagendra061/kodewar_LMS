@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction } from 'express';
+import type { Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
 import { dbManager, hashPassword } from './db.ts';
 import type { AuthUser, AdminUser, CandidateUser } from '../src/types/index.ts';
