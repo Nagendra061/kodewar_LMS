@@ -28,6 +28,18 @@ export function setStoredToken(token: string | null): void {
   }
 }
 
+function toQueryString(params?: Record<string, any>): string {
+  if (!params) return '';
+  const searchParams = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null && value !== '' && value !== 'undefined' && value !== 'all') {
+      searchParams.append(key, String(value));
+    }
+  }
+  const str = searchParams.toString();
+  return str ? `?${str}` : '';
+}
+
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const token = getStoredToken();
   const headers: Record<string, string> = {
@@ -82,10 +94,8 @@ export const api = {
     }),
 
   // Candidates
-  getCandidates: (params?: { courseId?: string; batchId?: string; status?: string; search?: string }) => {
-    const query = new URLSearchParams(params as any).toString();
-    return request<{ candidates: CandidateUser[] }>(`/candidates${query ? `?${query}` : ''}`);
-  },
+  getCandidates: (params?: { courseId?: string; batchId?: string; status?: string; search?: string }) =>
+    request<{ candidates: CandidateUser[] }>(`/candidates${toQueryString(params)}`),
 
   getCandidateById: (id: string) =>
     request<{ candidate: CandidateUser; assignments: CandidateBatchAssignment[]; attendance: AttendanceRecord[] }>(
@@ -206,10 +216,8 @@ export const api = {
     }),
 
   // Meetings
-  getMeetings: (params?: { batchId?: string; courseId?: string; tutorId?: string; status?: string }) => {
-    const query = new URLSearchParams(params as any).toString();
-    return request<{ meetings: MeetingSession[] }>(`/meetings${query ? `?${query}` : ''}`);
-  },
+  getMeetings: (params?: { batchId?: string; courseId?: string; tutorId?: string; status?: string }) =>
+    request<{ meetings: MeetingSession[] }>(`/meetings${toQueryString(params)}`),
 
   createMeeting: (data: any) =>
     request<{ session: MeetingSession; hasTutorConflict?: boolean; conflictWarning?: string }>('/meetings', {
@@ -302,10 +310,8 @@ export const api = {
     }>('/candidate/attendance'),
 
   // Resources
-  getResources: (params?: { courseId?: string; batchId?: string; category?: string; status?: string }) => {
-    const query = new URLSearchParams(params as any).toString();
-    return request<{ resources: ResourceItem[] }>(`/resources${query ? `?${query}` : ''}`);
-  },
+  getResources: (params?: { courseId?: string; batchId?: string; category?: string; status?: string }) =>
+    request<{ resources: ResourceItem[] }>(`/resources${toQueryString(params)}`),
 
   createResource: (data: Partial<ResourceItem>) =>
     request<{ resource: ResourceItem }>('/resources', {
@@ -369,10 +375,8 @@ export const api = {
   getAuditLogs: () =>
     request<{ logs: AuditLog[] }>('/audit-logs'),
 
-  getEmailLogs: (params?: { status?: string; search?: string }) => {
-    const query = new URLSearchParams(params as any).toString();
-    return request<{ logs: EmailLog[] }>(`/email-logs${query ? `?${query}` : ''}`);
-  },
+  getEmailLogs: (params?: { status?: string; search?: string }) =>
+    request<{ logs: EmailLog[] }>(`/email-logs${toQueryString(params)}`),
 
   getEmailLogById: (id: string) =>
     request<{ log: EmailLog }>(`/email-logs/${id}`),

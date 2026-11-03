@@ -367,17 +367,20 @@ apiRouter.get('/candidates', requireAdmin, (req, res) => {
     };
   });
 
-  if (courseId) list = list.filter((c) => c.courseId === courseId);
-  if (batchId) list = list.filter((c) => c.currentBatchId === batchId);
-  if (status) list = list.filter((c) => c.status === status);
-  if (search) {
-    const q = String(search).toLowerCase();
+  const isValidParam = (v: any) => v && v !== 'undefined' && v !== 'null' && v !== 'all' && String(v).trim().length > 0;
+
+  if (isValidParam(courseId)) list = list.filter((c) => c.courseId === courseId);
+  if (isValidParam(batchId)) list = list.filter((c) => c.currentBatchId === batchId);
+  if (isValidParam(status)) list = list.filter((c) => c.status === status);
+  if (isValidParam(search)) {
+    const q = String(search).trim().toLowerCase();
     list = list.filter(
       (c) =>
-        c.name.toLowerCase().includes(q) ||
-        c.email.toLowerCase().includes(q) ||
-        c.candidateId.toLowerCase().includes(q) ||
-        (c.phone && c.phone.includes(q))
+        (c.name && c.name.toLowerCase().includes(q)) ||
+        (c.email && c.email.toLowerCase().includes(q)) ||
+        (c.candidateId && c.candidateId.toLowerCase().includes(q)) ||
+        (c.phone && c.phone.includes(q)) ||
+        (c.remarks && c.remarks.toLowerCase().includes(q))
     );
   }
 
@@ -1472,10 +1475,12 @@ apiRouter.get('/meetings', requireAdmin, (req, res) => {
     };
   });
 
-  if (batchId) list = list.filter((m) => m.batchId === batchId);
-  if (courseId) list = list.filter((m) => m.courseId === courseId);
-  if (tutorId) list = list.filter((m) => m.tutorId === tutorId);
-  if (status) list = list.filter((m) => m.status === status);
+  const isValidParam = (v: any) => v && v !== 'undefined' && v !== 'null' && v !== 'all' && String(v).trim().length > 0;
+
+  if (isValidParam(batchId)) list = list.filter((m) => m.batchId === batchId);
+  if (isValidParam(courseId)) list = list.filter((m) => m.courseId === courseId);
+  if (isValidParam(tutorId)) list = list.filter((m) => m.tutorId === tutorId);
+  if (isValidParam(status)) list = list.filter((m) => m.status === status);
 
   // Sort descending by date & start time
   list.sort((a, b) => (b.date + b.startTime).localeCompare(a.date + a.startTime));
@@ -2225,10 +2230,12 @@ apiRouter.get('/resources', requireAdmin, (req, res) => {
     };
   });
 
-  if (courseId) list = list.filter((r) => r.courseId === courseId);
-  if (batchId) list = list.filter((r) => r.batchId === batchId);
-  if (category) list = list.filter((r) => r.category === category);
-  if (status) list = list.filter((r) => r.status === status);
+  const isValidParam = (v: any) => v && v !== 'undefined' && v !== 'null' && v !== 'all' && String(v).trim().length > 0;
+
+  if (isValidParam(courseId)) list = list.filter((r) => r.courseId === courseId);
+  if (isValidParam(batchId)) list = list.filter((r) => r.batchId === batchId);
+  if (isValidParam(category)) list = list.filter((r) => r.category === category);
+  if (isValidParam(status)) list = list.filter((r) => r.status === status);
 
   res.json({ resources: list });
 });
@@ -2600,11 +2607,13 @@ apiRouter.get('/email-logs', requireAdmin, (req, res) => {
   const { status, search } = req.query;
   let logs = [...db.emailLogs];
 
-  if (status) {
+  const isValidParam = (v: any) => v && v !== 'undefined' && v !== 'null' && v !== 'all' && String(v).trim().length > 0;
+
+  if (isValidParam(status)) {
     logs = logs.filter((l) => l.deliveryStatus === status);
   }
-  if (search) {
-    const q = String(search).toLowerCase();
+  if (isValidParam(search)) {
+    const q = String(search).trim().toLowerCase();
     logs = logs.filter(
       (l) =>
         l.recipientEmail.toLowerCase().includes(q) ||

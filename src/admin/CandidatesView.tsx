@@ -423,7 +423,10 @@ Rohan Verma,rohan.verma@example.com,+91 9876543212,KDL-2026-003,Frontend special
         <div className="flex items-center gap-2 flex-wrap">
           <select
             value={courseFilter}
-            onChange={(e) => setCourseFilter(e.target.value)}
+            onChange={(e) => {
+              setCourseFilter(e.target.value);
+              setBatchFilter('');
+            }}
             className="px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300"
           >
             <option value="">All Courses</option>
@@ -440,11 +443,13 @@ Rohan Verma,rohan.verma@example.com,+91 9876543212,KDL-2026-003,Frontend special
             className="px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300"
           >
             <option value="">All Batches</option>
-            {batches.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.name}
-              </option>
-            ))}
+            {batches
+              .filter((b) => !courseFilter || b.courseId === courseFilter)
+              .map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                </option>
+              ))}
           </select>
 
           <select
@@ -458,6 +463,21 @@ Rohan Verma,rohan.verma@example.com,+91 9876543212,KDL-2026-003,Frontend special
             <option value="inactive">Inactive</option>
             <option value="archived">Archived</option>
           </select>
+
+          {(search || courseFilter || batchFilter || statusFilter) && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearch('');
+                setCourseFilter('');
+                setBatchFilter('');
+                setStatusFilter('');
+              }}
+              className="px-2.5 py-1.5 text-xs rounded-lg border border-rose-200 dark:border-rose-800 bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 hover:bg-rose-100 transition-colors"
+            >
+              Clear Filters
+            </button>
+          )}
         </div>
       </div>
 

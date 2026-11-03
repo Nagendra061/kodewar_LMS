@@ -7,18 +7,281 @@
     "passwordHash": "f63e21d4b0af7c1915d6e311294b9d69d4e6314762c5b68175478a2350923047739e4302bf9ecb61bc2e9a5d3bfabb86d9686fe09f3529e3aed7f8ef3d8fbc25",
     "salt": "3d1b774373f40626105f781dcd991cd7"
   },
-  "candidates": [],
-  "courses": [],
-  "batches": [],
-  "tutors": [],
-  "candidateBatchAssignments": [],
+  "candidates": [
+    {
+      "id": "cand-1793729876348",
+      "candidateId": "KDL-2026-001",
+      "name": "Nagendra",
+      "email": "nagendra@kodewar.com",
+      "phone": "+91 8978138557",
+      "courseId": "crs-1793729537924",
+      "currentBatchId": "batch-1793729688919",
+      "enrollmentDate": "2026-11-03",
+      "status": "pending_activation",
+      "mustChangePassword": true,
+      "role": "candidate",
+      "passwordHash": "1d45acdae59ba5b6dffdcdbd1233d0e0083d57fff04b860477e3afe2764c567c3ed7a95c496800d72099fb3df05f0ea9723c7104f9d99ccff702ec42e90b7d86",
+      "salt": "4c37b3111d4c04d697eebd8dba26055b",
+      "tempPassword": "Pass@9961",
+      "remarks": "Computer science"
+    },
+    {
+      "id": "cand-1793730479888",
+      "candidateId": "KDL-2026-002",
+      "name": "Nagendrad",
+      "email": "nagendrad@kodewar.com",
+      "phone": "8878984778",
+      "courseId": "crs-1793729537924",
+      "currentBatchId": "batch-1793729688919",
+      "enrollmentDate": "2026-11-03",
+      "status": "active",
+      "mustChangePassword": false,
+      "role": "candidate",
+      "passwordHash": "d5c52f7f1cd0a3e2a65ba601c5226ce11333f82a25d88cef528d615b44702698459a82bf3e04d562ceb53e84b85b4ec1e070043833ada0f86bd9160c2f6d7587",
+      "salt": "de35eee9776f18ba8295f8678a9cce48",
+      "remarks": "learner"
+    }
+  ],
+  "courses": [
+    {
+      "id": "crs-1793729537924",
+      "code": "PYT001",
+      "name": "python fullstack",
+      "description": "Python with Django.",
+      "duration": "8 Weeks",
+      "status": "active",
+      "startDate": "",
+      "endDate": "",
+      "createdAt": "2026-11-03T18:12:17.924Z"
+    }
+  ],
+  "batches": [
+    {
+      "id": "batch-1793729688919",
+      "code": "B-2026",
+      "name": "Morning Batch",
+      "courseId": "crs-1793729537924",
+      "courseName": "python fullstack",
+      "capacity": 30,
+      "candidateCount": 2,
+      "status": "active",
+      "startDate": "2026-11-03",
+      "endDate": "2026-12-29",
+      "notes": "",
+      "createdAt": "2026-11-03T18:14:48.919Z"
+    }
+  ],
+  "tutors": [
+    {
+      "id": "tut-1793729793491",
+      "tutorId": "TUT-101",
+      "name": "vinay",
+      "email": "vinay@kodewar.com",
+      "phone": "+91 8978852255",
+      "specialization": "Python with web development",
+      "status": "active",
+      "assignedCourseIds": [
+        "crs-1793729537924"
+      ],
+      "assignedCourseNames": [
+        "python fullstack"
+      ],
+      "notes": "free",
+      "createdAt": "2026-11-03T18:16:33.491Z"
+    }
+  ],
+  "candidateBatchAssignments": [
+    {
+      "id": "asg-1793729876349",
+      "candidateId": "cand-1793729876348",
+      "batchId": "batch-1793729688919",
+      "batchName": "Morning Batch",
+      "courseId": "crs-1793729537924",
+      "courseName": "python fullstack",
+      "startDate": "2026-11-03",
+      "status": "active",
+      "createdAt": "2026-11-03T18:17:56.349Z"
+    },
+    {
+      "id": "asg-1793730479888",
+      "candidateId": "cand-1793730479888",
+      "batchId": "batch-1793729688919",
+      "batchName": "Morning Batch",
+      "courseId": "crs-1793729537924",
+      "courseName": "python fullstack",
+      "startDate": "2026-11-03",
+      "status": "active",
+      "createdAt": "2026-11-03T18:27:59.888Z"
+    }
+  ],
   "meetingSeries": [],
   "meetingSessions": [],
   "attendance": [],
   "resources": [],
   "notifications": [],
-  "emailLogs": [],
+  "emailLogs": [
+    {
+      "id": "email-1793730889934-eromp",
+      "recipientEmail": "nagendra@kodewar.com",
+      "recipientName": "Nagendra",
+      "subject": "Your Account Credentials - Kodewar Digital Learn",
+      "template": "activation",
+      "deliveryStatus": "delivered",
+      "sentAt": "2026-11-03T18:34:49.934Z",
+      "deliveredAt": "2026-11-03T18:34:49.934Z"
+    },
+    {
+      "id": "email-1793730578582-p3v20",
+      "recipientEmail": "nagendrad@kodewar.com",
+      "recipientName": "Nagendrad",
+      "subject": "Password Updated Successfully",
+      "template": "password_reset",
+      "deliveryStatus": "sent",
+      "sentAt": "2026-11-03T18:29:38.582Z",
+      "deliveredAt": "2026-11-03T18:29:38.582Z"
+    },
+    {
+      "id": "email-1793730479888-tw7ly",
+      "recipientEmail": "nagendrad@kodewar.com",
+      "recipientName": "Nagendrad",
+      "subject": "Welcome to Kodewar Digital Learn - Activation Credentials",
+      "template": "activation",
+      "deliveryStatus": "delivered",
+      "sentAt": "2026-11-03T18:27:59.888Z",
+      "deliveredAt": "2026-11-03T18:27:59.888Z"
+    },
+    {
+      "id": "email-1793729876349-sfso0",
+      "recipientEmail": "nagendra@kodewar.com",
+      "recipientName": "Nagendra",
+      "subject": "Welcome to Kodewar Digital Learn - Activation Credentials",
+      "template": "activation",
+      "deliveryStatus": "delivered",
+      "sentAt": "2026-11-03T18:17:56.349Z",
+      "deliveredAt": "2026-11-03T18:17:56.349Z"
+    }
+  ],
   "auditLogs": [
+    {
+      "id": "audit-1793730889936-w6xqq",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "ACTIVATION_RESENT",
+      "entityType": "candidate",
+      "entityId": "cand-1793729876348",
+      "summary": "Resent activation credentials to nagendra@kodewar.com.",
+      "timestamp": "2026-11-03T18:34:49.936Z"
+    },
+    {
+      "id": "audit-1793730589844-5lgbj",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "ADMIN_LOGIN",
+      "entityType": "auth",
+      "entityId": "admin-1",
+      "summary": "Super Admin logged in successfully.",
+      "timestamp": "2026-11-03T18:29:49.844Z"
+    },
+    {
+      "id": "audit-1793730578581-zygn7",
+      "actorEmail": "nagendrad@kodewar.com",
+      "actorRole": "candidate",
+      "action": "PASSWORD_CHANGED",
+      "entityType": "candidate",
+      "entityId": "cand-1793730479888",
+      "summary": "Candidate KDL-2026-002 set permanent password.",
+      "timestamp": "2026-11-03T18:29:38.581Z"
+    },
+    {
+      "id": "audit-1793730554817-aoirq",
+      "actorEmail": "nagendrad@kodewar.com",
+      "actorRole": "candidate",
+      "action": "CANDIDATE_LOGIN",
+      "entityType": "candidate",
+      "entityId": "cand-1793730479888",
+      "summary": "Candidate Nagendrad (KDL-2026-002) logged in.",
+      "timestamp": "2026-11-03T18:29:14.817Z"
+    },
+    {
+      "id": "audit-1793730479889-ztrlx",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "CANDIDATE_CREATED",
+      "entityType": "candidate",
+      "entityId": "cand-1793730479888",
+      "summary": "Candidate Nagendrad (KDL-2026-002) created in Morning Batch.",
+      "timestamp": "2026-11-03T18:27:59.889Z"
+    },
+    {
+      "id": "audit-1793730419756-ucdjn",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "ADMIN_LOGIN",
+      "entityType": "auth",
+      "entityId": "admin-1",
+      "summary": "Super Admin logged in successfully.",
+      "timestamp": "2026-11-03T18:26:59.756Z"
+    },
+    {
+      "id": "audit-1793729938587-wgveg",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "ADMIN_LOGIN",
+      "entityType": "auth",
+      "entityId": "admin-1",
+      "summary": "Super Admin logged in successfully.",
+      "timestamp": "2026-11-03T18:18:58.587Z"
+    },
+    {
+      "id": "audit-1793729876350-ashdk",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "CANDIDATE_CREATED",
+      "entityType": "candidate",
+      "entityId": "cand-1793729876348",
+      "summary": "Candidate Nagendra (KDL-2026-001) created in Morning Batch.",
+      "timestamp": "2026-11-03T18:17:56.350Z"
+    },
+    {
+      "id": "audit-1793729793492-oib6w",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "TUTOR_CREATED",
+      "entityType": "tutor",
+      "entityId": "tut-1793729793491",
+      "summary": "Tutor vinay (TUT-101) created.",
+      "timestamp": "2026-11-03T18:16:33.492Z"
+    },
+    {
+      "id": "audit-1793729688920-8ofgz",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "BATCH_CREATED",
+      "entityType": "batch",
+      "entityId": "batch-1793729688919",
+      "summary": "Batch Morning Batch (B-2026) created under python fullstack.",
+      "timestamp": "2026-11-03T18:14:48.920Z"
+    },
+    {
+      "id": "audit-1793729630095-mfose",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "COURSE_UPDATED",
+      "entityType": "course",
+      "entityId": "crs-1793729537924",
+      "summary": "Course PYT001 updated.",
+      "timestamp": "2026-11-03T18:13:50.095Z"
+    },
+    {
+      "id": "audit-1793729537925-64qrj",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "COURSE_CREATED",
+      "entityType": "course",
+      "entityId": "crs-1793729537924",
+      "summary": "Course python fullstack (PYT001) created.",
+      "timestamp": "2026-11-03T18:12:17.925Z"
+    },
     {
       "id": "audit-1793728856016-fk2wc",
       "actorEmail": "admin@kodewar.com",
