@@ -77,11 +77,6 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ currentTab, onSelect
           );
         })}
       </nav>
-
-      <div className="px-5 pt-4 mt-auto border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-400">
-        <div>Super Admin Console</div>
-        <div className="text-[10px] text-slate-500 font-mono mt-0.5">Single-Company MVP</div>
-      </div>
     </aside>
   );
 };

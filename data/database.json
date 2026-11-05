@@ -122,6 +122,36 @@
   "emailLogs": [],
   "auditLogs": [
     {
+      "id": "audit-1793872124243-tfs0q",
+      "actorEmail": "admin@kodewar.com",
+      "actorRole": "admin",
+      "action": "ADMIN_LOGIN",
+      "entityType": "auth",
+      "entityId": "admin-1",
+      "summary": "Super Admin logged in successfully.",
+      "timestamp": "2026-11-05T09:48:44.243Z"
+    },
+    {
+      "id": "audit-1793872093141-ziwl3",
+      "actorEmail": "nagendrad@kodewar.com",
+      "actorRole": "candidate",
+      "action": "CANDIDATE_LOGIN",
+      "entityType": "candidate",
+      "entityId": "cand-1793730479888",
+      "summary": "Candidate Nagendrad (KDL-2026-002) logged in.",
+      "timestamp": "2026-11-05T09:48:13.141Z"
+    },
+    {
+      "id": "audit-1793871198800-8s949",
+      "actorEmail": "nagendrad@kodewar.com",
+      "actorRole": "candidate",
+      "action": "CANDIDATE_LOGIN",
+      "entityType": "candidate",
+      "entityId": "cand-1793730479888",
+      "summary": "Candidate Nagendrad (KDL-2026-002) logged in.",
+      "timestamp": "2026-11-05T09:33:18.801Z"
+    },
+    {
       "id": "audit-1793869300003-lkt53",
       "actorEmail": "nagendrad@kodewar.com",
       "actorRole": "candidate",

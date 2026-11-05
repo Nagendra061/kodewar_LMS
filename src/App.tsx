@@ -127,32 +127,46 @@ const MainApp: React.FC = () => {
         )}
 
         {/* Content Viewport */}
-        <main className="flex-1 overflow-y-auto">
-          {user.role === 'admin' ? (
-            <>
-              {adminTab === 'dashboard' && <AdminDashboard onNavigate={setAdminTab} />}
-              {adminTab === 'candidates' && <CandidatesView />}
-              {adminTab === 'courses' && <CoursesView />}
-              {adminTab === 'batches' && <BatchesView />}
-              {adminTab === 'tutors' && <TutorsView />}
-              {adminTab === 'meetings' && <MeetingSchedulerView />}
-              {adminTab === 'attendance' && <AttendanceView />}
-              {adminTab === 'resources' && <ResourcesView />}
-              {adminTab === 'notifications' && <NotificationsView />}
-              {adminTab === 'reports' && <ReportsView />}
-              {/* {adminTab === 'audit-logs' && <AuditLogsView />} */}
-              {adminTab === 'settings' && <SettingsView />}
-            </>
-          ) : (
-            <>
-              {candidateTab === 'dashboard' && <CandidateDashboard onNavigate={setCandidateTab} />}
-              {candidateTab === 'meetings' && <CandidateMeetingsView />}
-              {candidateTab === 'resources' && <CandidateResourcesView />}
-              {candidateTab === 'attendance' && <CandidateAttendanceView />}
-              {candidateTab === 'notifications' && <CandidateNotificationsView />}
-              {candidateTab === 'profile' && <CandidateProfileView />}
-            </>
-          )}
+        <main className="flex-1 overflow-y-auto relative">
+          {/* Background Watermark */}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none fixed inset-0 flex items-center justify-center z-0 overflow-hidden select-none md:left-64 top-14"
+          >
+            <img
+              src="/logo.png"
+              alt=""
+              className="w-[460px] max-w-[65vw] max-h-[65vh] object-contain opacity-[0.04] dark:opacity-[0.06] filter grayscale pointer-events-none"
+            />
+          </div>
+
+          <div className="relative z-10 min-h-full">
+            {user.role === 'admin' ? (
+              <>
+                {adminTab === 'dashboard' && <AdminDashboard onNavigate={setAdminTab} />}
+                {adminTab === 'candidates' && <CandidatesView />}
+                {adminTab === 'courses' && <CoursesView />}
+                {adminTab === 'batches' && <BatchesView />}
+                {adminTab === 'tutors' && <TutorsView />}
+                {adminTab === 'meetings' && <MeetingSchedulerView />}
+                {adminTab === 'attendance' && <AttendanceView />}
+                {adminTab === 'resources' && <ResourcesView />}
+                {adminTab === 'notifications' && <NotificationsView />}
+                {adminTab === 'reports' && <ReportsView />}
+                {/* {adminTab === 'audit-logs' && <AuditLogsView />} */}
+                {adminTab === 'settings' && <SettingsView />}
+              </>
+            ) : (
+              <>
+                {candidateTab === 'dashboard' && <CandidateDashboard onNavigate={setCandidateTab} />}
+                {candidateTab === 'meetings' && <CandidateMeetingsView />}
+                {candidateTab === 'resources' && <CandidateResourcesView />}
+                {candidateTab === 'attendance' && <CandidateAttendanceView />}
+                {candidateTab === 'notifications' && <CandidateNotificationsView />}
+                {candidateTab === 'profile' && <CandidateProfileView />}
+              </>
+            )}
+          </div>
         </main>
       </div>
 

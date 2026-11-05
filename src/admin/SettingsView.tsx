@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/api.ts';
+import { useAuth } from '../context/AuthContext.tsx';
 import type { SystemSettings } from '../types/index.ts';
-import { Save, CheckCircle2, Globe, Mail, BookOpen } from 'lucide-react';
+import { Save, CheckCircle2, Globe, Mail, BookOpen, LogOut } from 'lucide-react';
 
 export const SettingsView: React.FC = () => {
+  const { user, logout } = useAuth();
   const [settings, setSettings] = useState<SystemSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -195,6 +197,36 @@ export const SettingsView: React.FC = () => {
           </button>
         </div>
       </form>
+
+      {/* Account Session & Sign Out */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-sm space-y-4">
+        <div className="flex items-center gap-2 pb-2 border-b border-slate-100 dark:border-slate-800">
+          <LogOut className="w-4 h-4 text-rose-500" />
+          <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+            Account Session
+          </h3>
+        </div>
+
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-1">
+          <div>
+            <p className="text-xs font-medium text-slate-900 dark:text-white">
+              Signed in as <span className="font-semibold">{user?.name}</span> ({user?.email})
+            </p>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+              End your active session securely and return to the authentication portal.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => logout()}
+            className="flex items-center gap-2 px-4 py-2 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/40 rounded-lg text-xs font-semibold transition-colors shrink-0"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            <span>Sign Out</span>
+          </button>
+        </div>
+      </div>
     </div>
   );
 };
