@@ -100,12 +100,53 @@ export function createInitialSeed(): DatabaseSchema {
 
 class DatabaseManager {
   private db: DatabaseSchema | null = null;
+  private isModified = false;
+  private lastSupabaseSync = 0;
 
   constructor() {
     this.ensureLoaded();
-    this.initSupabaseSync().catch((err) => {
-      console.warn('[Supabase Sync Warn]:', err);
-    });
+    // In Vercel production, connect Supabase as storage system!
+    if (IS_VERCEL) {
+      this.initSupabaseSync().catch((err) => {
+        console.warn('[Supabase Sync Warn]:', err);
+      });
+    }
+  }
+
+  public isDirty(): boolean {
+    return this.isModified;
+  }
+
+  public async ensureSupabaseLoaded(force = false): Promise<void> {
+    if (!isSupabaseConnected()) return;
+    const now = Date.now();
+    // Cache for 3 seconds across rapid parallel calls in the same container
+    if (!force && this.db && now - this.lastSupabaseSync < 3000) {
+      return;
+    }
+    const remoteData = await fetchFromSupabase();
+    if (remoteData && typeof remoteData === 'object' && remoteData.admin) {
+      this.db = remoteData;
+      this.normalizeDb();
+      this.lastSupabaseSync = now;
+      this.isModified = false;
+    }
+  }
+
+  public async flushToSupabase(): Promise<boolean> {
+    if (!this.db || !isSupabaseConnected()) return false;
+    try {
+      this.reconcileIntegrity();
+      const ok = await saveToSupabase(this.db);
+      if (ok) {
+        this.isModified = false;
+        this.lastSupabaseSync = Date.now();
+      }
+      return ok;
+    } catch (e) {
+      console.error('[Supabase Flush Error]:', e);
+      return false;
+    }
   }
 
   public async initSupabaseSync(): Promise<void> {
@@ -117,7 +158,7 @@ class DatabaseManager {
         this.normalizeDb();
         const content = JSON.stringify(this.db, null, 2);
         fs.writeFileSync(DB_FILE, content, 'utf-8');
-        console.log('[Supabase] Initialized local cache from remote Supabase database.');
+        console.log('[Supabase] Initialized state from remote Supabase database.');
       } else if (this.db) {
         // If remote is empty, push our local data to Supabase
         await saveToSupabase(this.db);
@@ -241,6 +282,8 @@ class DatabaseManager {
     if (!this.db) return;
     try {
       this.reconcileIntegrity();
+      this.isModified = true;
+
       const content = JSON.stringify(this.db, null, 2);
       fs.writeFileSync(DB_FILE, content, 'utf-8');
       try {
@@ -249,8 +292,8 @@ class DatabaseManager {
         // Non-fatal backup write
       }
 
-      // Replicate asynchronously to Supabase if connected
-      if (isSupabaseConnected()) {
+      // In Vercel production, replicate to Supabase storage
+      if (IS_VERCEL && isSupabaseConnected()) {
         saveToSupabase(this.db).catch((err) => {
           console.error('[Supabase Replicate Error]:', err);
         });
