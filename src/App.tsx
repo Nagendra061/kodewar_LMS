@@ -83,7 +83,7 @@ const MainApp: React.FC = () => {
       {/* 3. Main Workspace Layout */}
       <div className="flex-1 flex overflow-hidden">
         {/* Desktop Sidebar */}
-        <div className="hidden md:flex">
+        <div className="hidden md:flex relative z-30">
           {user.role === 'admin' ? (
             <AdminSidebar currentTab={adminTab} onSelectTab={setAdminTab} />
           ) : (
@@ -128,19 +128,19 @@ const MainApp: React.FC = () => {
 
         {/* Content Viewport */}
         <main className="flex-1 overflow-y-auto relative">
-          {/* Background Watermark */}
+          {/* Light Watermark Overlay across all sections & cards on both Admin & Candidate portals */}
           <div
             aria-hidden="true"
-            className="pointer-events-none fixed inset-0 flex items-center justify-center z-0 overflow-hidden select-none md:left-64 top-14"
+            className="pointer-events-none fixed inset-0 flex items-center justify-center z-20 overflow-hidden select-none md:left-64"
           >
             <img
               src="/logo.png"
               alt=""
-              className="w-[460px] max-w-[65vw] max-h-[65vh] object-contain opacity-[0.04] dark:opacity-[0.06] filter grayscale pointer-events-none"
+              className="w-[500px] max-w-[60vw] max-h-[60vh] object-contain opacity-[0.06] dark:opacity-[0.08] dark:invert pointer-events-none"
             />
           </div>
 
-          <div className="relative z-10 min-h-full">
+          <div className="relative min-h-full">
             {user.role === 'admin' ? (
               <>
                 {adminTab === 'dashboard' && <AdminDashboard onNavigate={setAdminTab} />}
