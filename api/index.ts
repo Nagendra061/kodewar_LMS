@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import { authMiddleware } from '../server/auth.ts';
 import { apiRouter } from '../server/api.ts';

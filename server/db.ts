@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
+import { fetchFromSupabase, saveToSupabase, isSupabaseConnected } from './supabase.ts';
 import type {
   AdminUser,
   CandidateUser,
@@ -102,6 +103,29 @@ class DatabaseManager {
 
   constructor() {
     this.ensureLoaded();
+    this.initSupabaseSync().catch((err) => {
+      console.warn('[Supabase Sync Warn]:', err);
+    });
+  }
+
+  public async initSupabaseSync(): Promise<void> {
+    if (!isSupabaseConnected()) return;
+    try {
+      const remoteData = await fetchFromSupabase();
+      if (remoteData && typeof remoteData === 'object' && remoteData.admin) {
+        this.db = remoteData;
+        this.normalizeDb();
+        const content = JSON.stringify(this.db, null, 2);
+        fs.writeFileSync(DB_FILE, content, 'utf-8');
+        console.log('[Supabase] Initialized local cache from remote Supabase database.');
+      } else if (this.db) {
+        // If remote is empty, push our local data to Supabase
+        await saveToSupabase(this.db);
+        console.log('[Supabase] Populated initial remote Supabase database from local state.');
+      }
+    } catch (err) {
+      console.error('[Supabase Init Error]:', err);
+    }
   }
 
   private ensureLoaded(): DatabaseSchema {
@@ -224,9 +248,33 @@ class DatabaseManager {
       } catch {
         // Non-fatal backup write
       }
+
+      // Replicate asynchronously to Supabase if connected
+      if (isSupabaseConnected()) {
+        saveToSupabase(this.db).catch((err) => {
+          console.error('[Supabase Replicate Error]:', err);
+        });
+      }
     } catch (err) {
       console.error('Error saving database:', err);
     }
+  }
+
+  public async forcePullFromSupabase(): Promise<boolean> {
+    const remoteData = await fetchFromSupabase();
+    if (remoteData && typeof remoteData === 'object' && remoteData.admin) {
+      this.db = remoteData;
+      this.normalizeDb();
+      const content = JSON.stringify(this.db, null, 2);
+      fs.writeFileSync(DB_FILE, content, 'utf-8');
+      return true;
+    }
+    return false;
+  }
+
+  public async forcePushToSupabase(): Promise<boolean> {
+    if (!this.db) return false;
+    return await saveToSupabase(this.db);
   }
 
   public logAudit(actorEmail: string, actorRole: string, action: string, entityType: string, entityId: string, summary: string): void {

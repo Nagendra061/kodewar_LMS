@@ -417,4 +417,26 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
+
+  // Supabase Cloud Database
+  getSupabaseStatus: () =>
+    request<{
+      connected: boolean;
+      url: string;
+      hasKey: boolean;
+      keyPreview: string;
+      lastSyncedAt: string | null;
+    }>('/supabase/status'),
+
+  configureSupabase: (url: string, key: string) =>
+    request<{ success: boolean; message: string; lastSyncedAt: string }>('/supabase/config', {
+      method: 'POST',
+      body: JSON.stringify({ url, key }),
+    }),
+
+  syncSupabase: (direction: 'push' | 'pull') =>
+    request<{ success: boolean; message: string }>('/supabase/sync', {
+      method: 'POST',
+      body: JSON.stringify({ direction }),
+    }),
 };

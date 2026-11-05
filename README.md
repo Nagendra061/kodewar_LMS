@@ -49,7 +49,7 @@ The primary objective of **Kodewar LMS (KDL)** is to provide an end-to-end, sing
 | :--- | :--- |
 | **Frontend** | React 19, TypeScript, Vite, Tailwind CSS, Lucide React, Motion |
 | **Backend** | Node.js, Express, TSX, Serverless API adapter (`api/index.ts`) |
-| **Data & Storage** | File-backed JSON Engine with synchronous persistence and mirror backup |
+| **Data & Storage** | Supabase Cloud PostgreSQL (with local JSON fallback and automated mirror backups) |
 | **Authentication** | Bearer Token session management, PBKDF2 password hashing with unique salts |
 | **Deployment** | Vercel (Frontend SPA + Serverless Express API), Cross-platform Windows/Linux support |
 
@@ -88,6 +88,23 @@ For initial testing and setup:
 | **Email** | `admin@kodewar.com` |
 | **Password** | `admin123` |
 | **Role** | Super Admin |
+
+---
+
+## 🗄️ Supabase Cloud Database Setup
+
+To enable persistent cloud database synchronization with Supabase:
+
+1. Create a free project at [supabase.com](https://supabase.com).
+2. In the **SQL Editor**, run the script found in [`supabase/schema.sql`](supabase/schema.sql).
+3. Copy your **Project URL** and **API Key (anon or service_role)** from **Project Settings > API**.
+4. Configure either:
+   - In `.env`:
+     ```env
+     SUPABASE_URL="https://your-project-id.supabase.co"
+     SUPABASE_ANON_KEY="your-anon-or-service-role-key"
+     ```
+   - OR directly inside the **Super Admin Portal > Settings > Supabase Cloud Database** section and click **Connect & Sync**.
 
 ---
 

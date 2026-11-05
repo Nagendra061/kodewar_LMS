@@ -2,6 +2,13 @@ import { Router } from 'express';
 import type { Response } from 'express';
 import crypto from 'crypto';
 import { dbManager, hashPassword } from './db.ts';
+import {
+  getSupabaseConfig,
+  isSupabaseConnected,
+  configureSupabase,
+  testSupabaseConnection,
+  getLastSyncedAt,
+} from './supabase.ts';
 import type { AuthenticatedRequest } from './auth.ts';
 import {
   generateToken,
@@ -2811,4 +2818,81 @@ apiRouter.put('/settings', requireAdmin, (req: AuthenticatedRequest, res) => {
   dbManager.save();
 
   res.json({ settings: db.settings });
+});
+
+// ==========================================
+// 13. SUPABASE CLOUD DATABASE INTEGRATION
+// ==========================================
+
+apiRouter.get('/supabase/status', requireAdmin, (req, res) => {
+  const config = getSupabaseConfig();
+  res.json({
+    connected: isSupabaseConnected(),
+    url: config.url,
+    hasKey: !!config.key,
+    keyPreview: config.key,
+    lastSyncedAt: getLastSyncedAt(),
+  });
+});
+
+apiRouter.post('/supabase/config', requireAdmin, async (req: AuthenticatedRequest, res) => {
+  const { url, key } = req.body;
+  if (!url || !key) {
+    res.status(400).json({ error: 'Supabase URL and API Key are required.' });
+    return;
+  }
+
+  const test = await testSupabaseConnection(url, key);
+  if (!test.ok) {
+    res.status(400).json({ error: test.message });
+    return;
+  }
+
+  configureSupabase(url, key);
+  // Auto-sync current database to Supabase
+  await dbManager.forcePushToSupabase();
+
+  dbManager.logAudit(
+    req.user!.email,
+    'admin',
+    'SUPABASE_CONFIGURED',
+    'database',
+    'supabase',
+    `Connected Supabase project: ${url.trim()}`
+  );
+
+  res.json({
+    success: true,
+    message: 'Supabase connected and database successfully synced!',
+    lastSyncedAt: getLastSyncedAt(),
+  });
+});
+
+apiRouter.post('/supabase/sync', requireAdmin, async (req: AuthenticatedRequest, res) => {
+  const { direction } = req.body;
+
+  if (!isSupabaseConnected()) {
+    res.status(400).json({ error: 'Supabase is not configured yet. Please configure URL and API Key.' });
+    return;
+  }
+
+  try {
+    if (direction === 'pull') {
+      const ok = await dbManager.forcePullFromSupabase();
+      if (!ok) {
+        res.status(400).json({ error: 'Failed to pull database from Supabase. Table may be empty.' });
+        return;
+      }
+      res.json({ success: true, message: 'Database successfully pulled from Supabase!' });
+    } else {
+      const ok = await dbManager.forcePushToSupabase();
+      if (!ok) {
+        res.status(400).json({ error: 'Failed to push database to Supabase.' });
+        return;
+      }
+      res.json({ success: true, message: 'Database successfully synced to Supabase!' });
+    }
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Sync failed.' });
+  }
 });
