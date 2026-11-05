@@ -16,10 +16,10 @@ import {
 
 export type AdminTab =
   | 'dashboard'
-  | 'candidates'
   | 'courses'
   | 'batches'
   | 'tutors'
+  | 'candidates'
   | 'meetings'
   | 'attendance'
   | 'resources'
@@ -36,10 +36,10 @@ interface AdminSidebarProps {
 export const AdminSidebar: React.FC<AdminSidebarProps> = ({ currentTab, onSelectTab }) => {
   const navItems: { id: AdminTab; label: string; icon: React.FC<{ className?: string }> }[] = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'candidates', label: 'Candidates', icon: Users },
     { id: 'courses', label: 'Courses', icon: BookOpen },
     { id: 'batches', label: 'Batches', icon: Layers },
     { id: 'tutors', label: 'Tutors', icon: GraduationCap },
+    { id: 'candidates', label: 'Candidates', icon: Users },
     { id: 'meetings', label: 'Meeting Scheduler', icon: Calendar },
     { id: 'attendance', label: 'Attendance', icon: CheckSquare },
     { id: 'resources', label: 'Resources', icon: FolderOpen },
