@@ -15,12 +15,14 @@ export const Header: React.FC<HeaderProps> = ({ currentTab }) => {
     <header className="sticky top-0 z-30 flex items-center justify-between gap-8 px-6 py-3.5 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
       {/* Zone 1: Brand wordmark (single line) */}
       <div className="flex items-center gap-3 shrink-0">
-        <div className="w-8 h-8 rounded-lg bg-slate-900 dark:bg-slate-100 flex items-center justify-center text-white dark:text-slate-900 font-bold text-sm">
-          K
-        </div>
+        <img
+          src="/favicon.png"
+          alt="Kodewar"
+          className="w-8 h-8 rounded-lg object-contain bg-white dark:bg-slate-800 p-0.5 border border-slate-200 dark:border-slate-700 shadow-xs"
+        />
         <div className="flex flex-col">
           <span className="text-base font-semibold tracking-tight text-slate-900 dark:text-white whitespace-nowrap">
-            Kodewar Digital Learn
+            Kodewar LMS
           </span>
           <span className="text-[11px] text-slate-500 dark:text-slate-400 font-normal">
             {user?.role === 'admin' ? 'Super Admin Portal' : 'Candidate Learning Portal'}

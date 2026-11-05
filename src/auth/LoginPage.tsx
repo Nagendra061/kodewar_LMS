@@ -33,12 +33,14 @@ export const LoginPage: React.FC = () => {
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="flex justify-center mb-4">
-          <div className="w-12 h-12 rounded-xl bg-slate-900 dark:bg-slate-100 flex items-center justify-center text-white dark:text-slate-900 font-bold text-xl shadow-sm">
-            K
-          </div>
+          <img
+            src="/favicon.png"
+            alt="Kodewar"
+            className="w-12 h-12 rounded-xl object-contain bg-white dark:bg-slate-800 p-1 border border-slate-200 dark:border-slate-700 shadow-sm"
+          />
         </div>
         <h2 className="text-center text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-          Kodewar Digital Learn
+          Kodewar LMS
         </h2>
         <p className="mt-1 text-center text-xs text-slate-500 dark:text-slate-400">
           Single-Company Digital Learning & Candidate Management
