@@ -39,7 +39,7 @@ export const LoginPage: React.FC = () => {
         <img
           src="/logo.png"
           alt=""
-          className="w-[480px] max-w-[70vw] max-h-[70vh] object-contain opacity-[0.06] dark:opacity-[0.08] dark:invert pointer-events-none"
+          className="w-[480px] max-w-[70vw] max-h-[70vh] object-contain opacity-[0.18] dark:opacity-[0.20] dark:invert pointer-events-none"
         />
       </div>
 

@@ -239,7 +239,7 @@ const MainApp: React.FC = () => {
             <img
               src="/logo.png"
               alt=""
-              className="w-[500px] max-w-[60vw] max-h-[60vh] object-contain opacity-[0.40] dark:opacity-[0.40] dark:invert pointer-events-none"
+              className="w-[500px] max-w-[60vw] max-h-[60vh] object-contain opacity-[0.18] dark:opacity-[0.20] dark:invert pointer-events-none"
             />
           </div>
 
