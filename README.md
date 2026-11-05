@@ -1,4 +1,4 @@
-# Kodewar Digital Learn (KDL)
+# Kodewar LMS (KDL)
 
 > **Single-Company Digital Learning & Candidate Management Platform**  
 > Streamlining cohort training, curriculum delivery, interactive live classes, and candidate lifecycle management.
@@ -7,7 +7,7 @@
 
 ## 🎯 Project Objective
 
-The primary objective of **Kodewar Digital Learn (KDL)** is to provide an end-to-end, single-company learning management system (LMS) and candidate tracking portal. It replaces fragmented spreadsheets and disconnected tools with a unified platform that connects administrators, instructors, and student candidates.
+The primary objective of **Kodewar LMS (KDL)** is to provide an end-to-end, single-company learning management system (LMS) and candidate tracking portal. It replaces fragmented spreadsheets and disconnected tools with a unified platform that connects administrators, instructors, and student candidates.
 
 ### Core Goals:
 1. **Streamline Candidate Administration**: Manage the complete lifecycle of candidates from registration, bulk CSV/Excel import, and automated candidate ID generation (`KDL-YYYY-XXX`) to course enrollment and batch transfers.

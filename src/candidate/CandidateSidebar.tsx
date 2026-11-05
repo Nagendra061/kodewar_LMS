@@ -74,7 +74,7 @@ export const CandidateSidebar: React.FC<CandidateSidebarProps> = ({
       </nav>
 
       <div className="px-5 pt-4 mt-auto border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-400">
-        <div>Kodewar Digital Learn</div>
+        <div>Kodewar LMS</div>
         <div className="text-[10px] text-emerald-600 font-medium mt-0.5">Enrolled Candidate</div>
       </div>
     </aside>

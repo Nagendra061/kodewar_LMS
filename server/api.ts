@@ -170,7 +170,7 @@ apiRouter.post('/auth/register', (req, res) => {
   dbManager.queueEmail(
     newCandidate.email,
     newCandidate.name,
-    'Welcome to Kodewar Digital Learn - Registration Successful',
+    'Welcome to Kodewar LMS - Registration Successful',
     'activation',
     'delivered'
   );
@@ -501,7 +501,7 @@ apiRouter.post('/candidates', requireAdmin, (req: AuthenticatedRequest, res) => 
   dbManager.queueEmail(
     newCandidate.email,
     newCandidate.name,
-    'Welcome to Kodewar Digital Learn - Activation Credentials',
+    'Welcome to Kodewar LMS - Activation Credentials',
     'activation',
     'delivered'
   );
@@ -673,7 +673,7 @@ apiRouter.post('/candidates/:id/resend-activation', requireAdmin, (req: Authenti
   dbManager.queueEmail(
     cand.email,
     cand.name,
-    'Your Account Credentials - Kodewar Digital Learn',
+    'Your Account Credentials - Kodewar LMS',
     'activation',
     'delivered'
   );
@@ -860,7 +860,7 @@ apiRouter.post('/candidates/import/commit', requireAdmin, (req: AuthenticatedReq
     dbManager.queueEmail(
       cand.email,
       cand.name,
-      'Welcome to Kodewar Digital Learn - Your Account Credentials',
+      'Welcome to Kodewar LMS - Your Account Credentials',
       'activation',
       'delivered'
     );

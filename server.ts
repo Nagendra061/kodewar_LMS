@@ -38,7 +38,7 @@ async function startServer() {
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`[Kodewar Digital Learn] Server running on port ${PORT} (isProduction: ${isProduction})`);
+    console.log(`[Kodewar LMS] Server running on port ${PORT} (isProduction: ${isProduction})`);
   });
 }
 

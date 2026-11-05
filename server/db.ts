@@ -62,7 +62,7 @@ export function createInitialSeed(): DatabaseSchema {
   const auditLogs: AuditLog[] = [];
 
   const settings: SystemSettings = {
-    companyName: 'Kodewar Digital Learn',
+    companyName: 'Kodewar LMS',
     companyTimezone: 'Asia/Kolkata',
     lateCountsAsAttended: true,
     excludeExcusedFromDenominator: true,

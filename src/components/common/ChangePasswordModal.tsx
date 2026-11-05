@@ -50,7 +50,7 @@ export const ChangePasswordModal: React.FC = () => {
           Set Permanent Password
         </h3>
         <p className="text-xs text-slate-500 dark:text-slate-400 mb-5 leading-relaxed">
-          Welcome to Kodewar Digital Learn! As a security requirement for newly enrolled candidates, you must replace your temporary credential with a permanent password before accessing your learning portal.
+          Welcome to Kodewar LMS! As a security requirement for newly enrolled candidates, you must replace your temporary credential with a permanent password before accessing your learning portal.
         </p>
 
         {error && (

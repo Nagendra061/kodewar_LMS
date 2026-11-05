@@ -592,7 +592,7 @@ export const NotificationsView: React.FC = () => {
                     <p>Dear {selectedEmailLog.recipientName},</p>
                     <p className="mt-1.5">
                       {selectedEmailLog.template === 'activation' &&
-                        'Welcome to Kodewar Digital Learn. Your candidate account has been provisioned. Please sign in and complete your initial password change.'}
+                        'Welcome to Kodewar LMS. Your candidate account has been provisioned. Please sign in and complete your initial password change.'}
                       {selectedEmailLog.template === 'meeting_scheduled' &&
                         'A new live learning session has been scheduled for your cohort batch. Please review your meeting calendar.'}
                       {selectedEmailLog.template === 'meeting_rescheduled' &&
@@ -608,7 +608,7 @@ export const NotificationsView: React.FC = () => {
                     </p>
                     <p className="mt-3 text-[11px] text-slate-400">
                       Best regards,<br />
-                      Kodewar Digital Learn Team
+                      Kodewar LMS Team
                     </p>
                   </div>
                 </div>
@@ -840,7 +840,7 @@ export const NotificationsView: React.FC = () => {
                   required
                   value={composeSubject}
                   onChange={(e) => setComposeSubject(e.target.value)}
-                  placeholder="e.g. Welcome to Kodewar Digital Learn - Orientation Details"
+                  placeholder="e.g. Welcome to Kodewar LMS - Orientation Details"
                   className="w-full px-3 py-1.5 text-xs rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                 />
               </div>

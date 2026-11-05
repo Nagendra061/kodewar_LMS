@@ -122,6 +122,16 @@
   "emailLogs": [],
   "auditLogs": [
     {
+      "id": "audit-1793869300003-lkt53",
+      "actorEmail": "nagendrad@kodewar.com",
+      "actorRole": "candidate",
+      "action": "CANDIDATE_LOGIN",
+      "entityType": "candidate",
+      "entityId": "cand-1793730479888",
+      "summary": "Candidate Nagendrad (KDL-2026-002) logged in.",
+      "timestamp": "2026-11-05T09:01:40.003Z"
+    },
+    {
       "id": "audit-1793731587699-a5av8",
       "actorEmail": "admin@kodewar.com",
       "actorRole": "admin",
