@@ -1,7 +1,12 @@
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
-import { fetchFromSupabase, saveToSupabase, isSupabaseConnected } from './supabase.ts';
+import {
+  fetchFromSupabase,
+  saveToSupabase,
+  isSupabaseConnected,
+  getSupabaseUpdatedAt,
+} from './supabase.ts';
 import type {
   AdminUser,
   CandidateUser,
@@ -101,12 +106,12 @@ export function createInitialSeed(): DatabaseSchema {
 class DatabaseManager {
   private db: DatabaseSchema | null = null;
   private isModified = false;
-  private lastSupabaseSync = 0;
+  private lastSyncedUpdatedAt: string | null = null;
   private inFlightSync: Promise<void> | null = null;
 
   constructor() {
     this.ensureLoaded();
-    // In Vercel production, connect Supabase as storage system!
+    // In Vercel production, connect Supabase as primary cloud storage system!
     if (IS_VERCEL) {
       this.initSupabaseSync().catch((err) => {
         console.warn('[Supabase Sync Warn]:', err);
@@ -120,11 +125,6 @@ class DatabaseManager {
 
   public async ensureSupabaseLoaded(force = false): Promise<void> {
     if (!isSupabaseConnected()) return;
-    const now = Date.now();
-    // Cache for 60 seconds across requests in the container
-    if (!force && this.db && now - this.lastSupabaseSync < 60000) {
-      return;
-    }
 
     // Deduplicate concurrent in-flight requests (so 6 parallel requests share 1 Supabase call)
     if (this.inFlightSync) {
@@ -133,11 +133,20 @@ class DatabaseManager {
 
     this.inFlightSync = (async () => {
       try {
-        const remoteData = await fetchFromSupabase(3000);
+        // Fast lightweight check: only check updated_at timestamp in Supabase (~30ms)
+        const remoteUpdatedAt = await getSupabaseUpdatedAt(1500);
+
+        // If local database is loaded and updated_at has NOT changed in Supabase, we are 100% up to date!
+        if (!force && this.db && remoteUpdatedAt && remoteUpdatedAt === this.lastSyncedUpdatedAt) {
+          return;
+        }
+
+        // Fresh state needed (either cold start or remote updated by another lambda instance)
+        const remoteData = await fetchFromSupabase(3500);
         if (remoteData && typeof remoteData === 'object' && remoteData.admin) {
           this.db = remoteData;
           this.normalizeDb();
-          this.lastSupabaseSync = Date.now();
+          this.lastSyncedUpdatedAt = remoteUpdatedAt || new Date().toISOString();
           this.isModified = false;
         }
       } catch (err) {
@@ -154,10 +163,11 @@ class DatabaseManager {
     if (!this.db || !isSupabaseConnected()) return false;
     try {
       this.reconcileIntegrity();
+      const now = new Date().toISOString();
       const ok = await saveToSupabase(this.db);
       if (ok) {
         this.isModified = false;
-        this.lastSupabaseSync = Date.now();
+        this.lastSyncedUpdatedAt = now;
       }
       return ok;
     } catch (e) {
@@ -307,13 +317,6 @@ class DatabaseManager {
         fs.writeFileSync(DB_BACKUP_FILE, content, 'utf-8');
       } catch {
         // Non-fatal backup write
-      }
-
-      // In Vercel production, replicate to Supabase storage
-      if (IS_VERCEL && isSupabaseConnected()) {
-        saveToSupabase(this.db).catch((err) => {
-          console.error('[Supabase Replicate Error]:', err);
-        });
       }
     } catch (err) {
       console.error('Error saving database:', err);

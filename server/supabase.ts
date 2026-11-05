@@ -1,13 +1,19 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import type { DatabaseSchema } from './db.ts';
 
-// Configurable via process.env or runtime admin settings
-let runtimeSupabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
+// Embedded fallback credentials (ensures Vercel serverless works even if dashboard env vars are not set)
+const DEFAULT_SUPABASE_URL = 'https://joazhbnpxljhhiolxdnn.supabase.co';
+const DEFAULT_SUPABASE_ANON_KEY =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpvYXpoYm5weGxqaGhpb2x4ZG5uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM4Njk1OTUsImV4cCI6MjEwOTQ0NTU5NX0.oa3s_fbRyqUe2rVbL2EA8uc78wXS7rYHuJM1j249Uto';
+
+// Configurable via process.env, runtime admin settings, or fallback defaults
+let runtimeSupabaseUrl =
+  process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || DEFAULT_SUPABASE_URL;
 let runtimeSupabaseKey =
   process.env.SUPABASE_SERVICE_ROLE_KEY ||
   process.env.SUPABASE_ANON_KEY ||
   process.env.VITE_SUPABASE_ANON_KEY ||
-  '';
+  DEFAULT_SUPABASE_ANON_KEY;
 
 let cachedClient: SupabaseClient | null = null;
 let lastSyncedAt: string | null = null;
@@ -51,6 +57,35 @@ export function isSupabaseConnected(): boolean {
 
 export function getLastSyncedAt(): string | null {
   return lastSyncedAt;
+}
+
+/**
+ * Lightweight check of the remote updated_at timestamp (~20ms query)
+ */
+export async function getSupabaseUpdatedAt(timeoutMs = 1500): Promise<string | null> {
+  const sb = getSupabaseClient();
+  if (!sb) return null;
+
+  try {
+    const fetchPromise = sb
+      .from('lms_state')
+      .select('updated_at')
+      .eq('id', 'primary')
+      .maybeSingle();
+
+    let timer: NodeJS.Timeout;
+    const timeoutPromise = new Promise<{ data: null }>((resolve) => {
+      timer = setTimeout(() => resolve({ data: null }), timeoutMs);
+    });
+
+    const res = await Promise.race([fetchPromise, timeoutPromise]);
+    clearTimeout(timer!);
+
+    const { data } = res as any;
+    return data?.updated_at || null;
+  } catch {
+    return null;
+  }
 }
 
 /**

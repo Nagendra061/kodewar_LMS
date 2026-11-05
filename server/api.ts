@@ -637,9 +637,12 @@ apiRouter.put('/candidates/:id', requireAdmin, (req: AuthenticatedRequest, res) 
   });
 });
 
-apiRouter.delete('/candidates/:id', requireAdmin, (req: AuthenticatedRequest, res) => {
+apiRouter.delete('/candidates/:id', requireAdmin, async (req: AuthenticatedRequest, res) => {
   const db = dbManager.get();
-  const index = db.candidates.findIndex((c) => c.id === req.params.id);
+  const targetId = String(req.params.id).trim().toLowerCase();
+  const index = db.candidates.findIndex(
+    (c) => c.id === req.params.id || c.candidateId.toLowerCase() === targetId
+  );
   if (index === -1) {
     res.status(404).json({ error: 'Candidate not found.' });
     return;
@@ -661,6 +664,10 @@ apiRouter.delete('/candidates/:id', requireAdmin, (req: AuthenticatedRequest, re
     cand.id,
     `Candidate ${cand.name} (${cand.candidateId}) deleted.`
   );
+  // Ensure changes are explicitly flushed and confirmed in Supabase for Vercel production
+  if (isSupabaseConnected()) {
+    await dbManager.flushToSupabase();
+  }
   res.json({ success: true, message: `Candidate ${cand.name} deleted successfully.` });
 });
 
