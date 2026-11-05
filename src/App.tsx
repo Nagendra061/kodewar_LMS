@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext.tsx';
 import { Header } from './components/common/Header.tsx';
 import { ChangePasswordModal } from './components/common/ChangePasswordModal.tsx';
@@ -35,11 +35,114 @@ import { CandidateProfileView } from './candidate/CandidateProfileView.tsx';
 
 import { Menu, X } from 'lucide-react';
 
+const ADMIN_TABS: AdminTab[] = [
+  'dashboard',
+  'courses',
+  'batches',
+  'tutors',
+  'candidates',
+  'meetings',
+  'attendance',
+  'resources',
+  'notifications',
+  'reports',
+  'audit-logs',
+  'settings',
+];
+
+const CANDIDATE_TABS: CandidateTab[] = [
+  'dashboard',
+  'meetings',
+  'resources',
+  'attendance',
+  'notifications',
+  'profile',
+];
+
+function getInitialTab<T extends string>(role: 'admin' | 'candidate', validTabs: T[]): T {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const tabParam = params.get('tab');
+    if (tabParam && validTabs.includes(tabParam as T)) {
+      return tabParam as T;
+    }
+
+    const hash = window.location.hash.replace(/^#/, '');
+    if (hash && validTabs.includes(hash as T)) {
+      return hash as T;
+    }
+
+    const saved = localStorage.getItem(`kodewar_${role}_tab`);
+    if (saved && validTabs.includes(saved as T)) {
+      return saved as T;
+    }
+  } catch {}
+
+  return validTabs[0];
+}
+
 const MainApp: React.FC = () => {
   const { user, isLoading } = useAuth();
-  const [adminTab, setAdminTab] = useState<AdminTab>('dashboard');
-  const [candidateTab, setCandidateTab] = useState<CandidateTab>('dashboard');
+  const [adminTab, setAdminTab] = useState<AdminTab>(() => getInitialTab('admin', ADMIN_TABS));
+  const [candidateTab, setCandidateTab] = useState<CandidateTab>(() => getInitialTab('candidate', CANDIDATE_TABS));
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const navigateAdmin = (tab: AdminTab) => {
+    setAdminTab(tab);
+    try {
+      localStorage.setItem('kodewar_admin_tab', tab);
+      const url = new URL(window.location.href);
+      if (url.searchParams.get('tab') !== tab) {
+        url.searchParams.set('tab', tab);
+        window.history.pushState({ tab }, '', url.toString());
+      }
+    } catch {}
+  };
+
+  const navigateCandidate = (tab: CandidateTab) => {
+    setCandidateTab(tab);
+    try {
+      localStorage.setItem('kodewar_candidate_tab', tab);
+      const url = new URL(window.location.href);
+      if (url.searchParams.get('tab') !== tab) {
+        url.searchParams.set('tab', tab);
+        window.history.pushState({ tab }, '', url.toString());
+      }
+    } catch {}
+  };
+
+  // Keep URL in sync with active tab on mount or tab change
+  useEffect(() => {
+    if (!user) return;
+    const current = user.role === 'admin' ? adminTab : candidateTab;
+    try {
+      const url = new URL(window.location.href);
+      if (url.searchParams.get('tab') !== current) {
+        url.searchParams.set('tab', current);
+        window.history.replaceState({ tab: current }, '', url.toString());
+      }
+    } catch {}
+  }, [user, adminTab, candidateTab]);
+
+  // Support browser Back/Forward navigation
+  useEffect(() => {
+    const onPopState = () => {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const tabParam = params.get('tab');
+        if (user?.role === 'admin' && tabParam && ADMIN_TABS.includes(tabParam as AdminTab)) {
+          setAdminTab(tabParam as AdminTab);
+          localStorage.setItem('kodewar_admin_tab', tabParam);
+        } else if (user?.role === 'candidate' && tabParam && CANDIDATE_TABS.includes(tabParam as CandidateTab)) {
+          setCandidateTab(tabParam as CandidateTab);
+          localStorage.setItem('kodewar_candidate_tab', tabParam);
+        }
+      } catch {}
+    };
+
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, [user?.role]);
 
   if (isLoading) {
     return (
@@ -62,8 +165,8 @@ const MainApp: React.FC = () => {
       <Header
         currentTab={user.role === 'admin' ? adminTab : candidateTab}
         onNavigate={(tab) => {
-          if (user.role === 'admin') setAdminTab(tab as AdminTab);
-          else setCandidateTab(tab as CandidateTab);
+          if (user.role === 'admin') navigateAdmin(tab as AdminTab);
+          else navigateCandidate(tab as CandidateTab);
         }}
       />
 
@@ -85,9 +188,9 @@ const MainApp: React.FC = () => {
         {/* Desktop Sidebar */}
         <div className="hidden md:flex relative z-30">
           {user.role === 'admin' ? (
-            <AdminSidebar currentTab={adminTab} onSelectTab={setAdminTab} />
+            <AdminSidebar currentTab={adminTab} onSelectTab={navigateAdmin} />
           ) : (
-            <CandidateSidebar currentTab={candidateTab} onSelectTab={setCandidateTab} />
+            <CandidateSidebar currentTab={candidateTab} onSelectTab={navigateCandidate} />
           )}
         </div>
 
@@ -108,7 +211,7 @@ const MainApp: React.FC = () => {
                   <AdminSidebar
                     currentTab={adminTab}
                     onSelectTab={(tab) => {
-                      setAdminTab(tab);
+                      navigateAdmin(tab);
                       setMobileMenuOpen(false);
                     }}
                   />
@@ -116,7 +219,7 @@ const MainApp: React.FC = () => {
                   <CandidateSidebar
                     currentTab={candidateTab}
                     onSelectTab={(tab) => {
-                      setCandidateTab(tab);
+                      navigateCandidate(tab);
                       setMobileMenuOpen(false);
                     }}
                   />
@@ -136,14 +239,14 @@ const MainApp: React.FC = () => {
             <img
               src="/logo.png"
               alt=""
-              className="w-[500px] max-w-[60vw] max-h-[60vh] object-contain opacity-[0.06] dark:opacity-[0.08] dark:invert pointer-events-none"
+              className="w-[500px] max-w-[60vw] max-h-[60vh] object-contain opacity-[0.40] dark:opacity-[0.40] dark:invert pointer-events-none"
             />
           </div>
 
           <div className="relative min-h-full">
             {user.role === 'admin' ? (
               <>
-                {adminTab === 'dashboard' && <AdminDashboard onNavigate={setAdminTab} />}
+                {adminTab === 'dashboard' && <AdminDashboard onNavigate={navigateAdmin} />}
                 {adminTab === 'candidates' && <CandidatesView />}
                 {adminTab === 'courses' && <CoursesView />}
                 {adminTab === 'batches' && <BatchesView />}
@@ -158,7 +261,7 @@ const MainApp: React.FC = () => {
               </>
             ) : (
               <>
-                {candidateTab === 'dashboard' && <CandidateDashboard onNavigate={setCandidateTab} />}
+                {candidateTab === 'dashboard' && <CandidateDashboard onNavigate={navigateCandidate} />}
                 {candidateTab === 'meetings' && <CandidateMeetingsView />}
                 {candidateTab === 'resources' && <CandidateResourcesView />}
                 {candidateTab === 'attendance' && <CandidateAttendanceView />}
