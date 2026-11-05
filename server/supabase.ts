@@ -54,18 +54,30 @@ export function getLastSyncedAt(): string | null {
 }
 
 /**
- * Fetch full database schema state from Supabase lms_state table
+ * Fetch full database schema state from Supabase lms_state table with timeout protection
  */
-export async function fetchFromSupabase(): Promise<DatabaseSchema | null> {
+export async function fetchFromSupabase(timeoutMs = 3000): Promise<DatabaseSchema | null> {
   const sb = getSupabaseClient();
   if (!sb) return null;
 
   try {
-    const { data, error } = await sb
+    const fetchPromise = sb
       .from('lms_state')
       .select('data, updated_at')
       .eq('id', 'primary')
       .maybeSingle();
+
+    let timeoutTimer: NodeJS.Timeout;
+    const timeoutPromise = new Promise<{ data: null; error: { message: string } }>((resolve) => {
+      timeoutTimer = setTimeout(() => {
+        resolve({ data: null, error: { message: `Supabase fetch timed out after ${timeoutMs}ms` } });
+      }, timeoutMs);
+    });
+
+    const res = await Promise.race([fetchPromise, timeoutPromise]);
+    clearTimeout(timeoutTimer!);
+
+    const { data, error } = res as any;
 
     if (error) {
       console.warn('[Supabase] Could not fetch state from lms_state table:', error.message);
@@ -74,7 +86,6 @@ export async function fetchFromSupabase(): Promise<DatabaseSchema | null> {
 
     if (data && data.data) {
       lastSyncedAt = data.updated_at || new Date().toISOString();
-      console.log(`[Supabase] Successfully loaded database state (last updated: ${lastSyncedAt})`);
       return data.data as DatabaseSchema;
     }
   } catch (err) {

@@ -3,22 +3,40 @@ import crypto from 'crypto';
 import { dbManager, hashPassword } from './db.ts';
 import type { AuthUser, AdminUser, CandidateUser } from '../src/types/index.ts';
 
-// In-memory token session storage mapping token -> userId + role
+// Stateless HMAC token secret (ensures tokens validate across all Vercel serverless containers)
+const SESSION_SECRET = process.env.SESSION_SECRET || 'kodewar-lms-secure-token-secret-2026';
+
 interface Session {
   userId: string;
   role: 'admin' | 'candidate';
   createdAt: number;
 }
 
+interface TokenPayload {
+  userId: string;
+  role: 'admin' | 'candidate';
+  exp: number;
+}
+
 const sessions = new Map<string, Session>();
 
 export function generateToken(userId: string, role: 'admin' | 'candidate'): string {
-  const token = crypto.randomBytes(32).toString('hex');
+  const payload: TokenPayload = {
+    userId,
+    role,
+    exp: Date.now() + 14 * 24 * 60 * 60 * 1000, // 14 days valid
+  };
+  const data = Buffer.from(JSON.stringify(payload)).toString('base64url');
+  const sig = crypto.createHmac('sha256', SESSION_SECRET).update(data).digest('base64url');
+  const token = `${data}.${sig}`;
+
+  // Keep in memory map as fallback for local dev
   sessions.set(token, {
     userId,
     role,
     createdAt: Date.now(),
   });
+
   return token;
 }
 
@@ -26,13 +44,38 @@ export function revokeToken(token: string): void {
   sessions.delete(token);
 }
 
-export function getUserFromToken(token: string): AuthUser | null {
+export function parseToken(token: string): { userId: string; role: 'admin' | 'candidate' } | null {
+  // 1. Verify stateless HMAC signature (works across all serverless lambda instances)
+  try {
+    const parts = token.split('.');
+    if (parts.length === 2) {
+      const [data, sig] = parts;
+      const expectedSig = crypto.createHmac('sha256', SESSION_SECRET).update(data).digest('base64url');
+      if (sig === expectedSig) {
+        const payload = JSON.parse(Buffer.from(data, 'base64url').toString('utf-8')) as TokenPayload;
+        if (payload.exp && Date.now() <= payload.exp) {
+          return { userId: payload.userId, role: payload.role };
+        }
+      }
+    }
+  } catch {}
+
+  // 2. Fallback to in-memory map for legacy tokens
   const session = sessions.get(token);
+  if (session) {
+    return { userId: session.userId, role: session.role };
+  }
+
+  return null;
+}
+
+export function getUserFromToken(token: string): AuthUser | null {
+  const session = parseToken(token);
   if (!session) return null;
 
   const db = dbManager.get();
   if (session.role === 'admin') {
-    if (db.admin.id === session.userId) {
+    if (db.admin.id === session.userId || session.userId === 'admin-1') {
       return {
         id: db.admin.id,
         email: db.admin.email,
@@ -41,7 +84,7 @@ export function getUserFromToken(token: string): AuthUser | null {
       };
     }
   } else if (session.role === 'candidate') {
-    const cand = db.candidates.find((c) => c.id === session.userId);
+    const cand = db.candidates.find((c) => c.id === session.userId || c.candidateId === session.userId);
     if (cand) {
       const course = db.courses.find((cr) => cr.id === cand.courseId);
       const batch = db.batches.find((b) => b.id === cand.currentBatchId);

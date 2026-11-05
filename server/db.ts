@@ -102,6 +102,7 @@ class DatabaseManager {
   private db: DatabaseSchema | null = null;
   private isModified = false;
   private lastSupabaseSync = 0;
+  private inFlightSync: Promise<void> | null = null;
 
   constructor() {
     this.ensureLoaded();
@@ -120,17 +121,33 @@ class DatabaseManager {
   public async ensureSupabaseLoaded(force = false): Promise<void> {
     if (!isSupabaseConnected()) return;
     const now = Date.now();
-    // Cache for 3 seconds across rapid parallel calls in the same container
-    if (!force && this.db && now - this.lastSupabaseSync < 3000) {
+    // Cache for 60 seconds across requests in the container
+    if (!force && this.db && now - this.lastSupabaseSync < 60000) {
       return;
     }
-    const remoteData = await fetchFromSupabase();
-    if (remoteData && typeof remoteData === 'object' && remoteData.admin) {
-      this.db = remoteData;
-      this.normalizeDb();
-      this.lastSupabaseSync = now;
-      this.isModified = false;
+
+    // Deduplicate concurrent in-flight requests (so 6 parallel requests share 1 Supabase call)
+    if (this.inFlightSync) {
+      return this.inFlightSync;
     }
+
+    this.inFlightSync = (async () => {
+      try {
+        const remoteData = await fetchFromSupabase(3000);
+        if (remoteData && typeof remoteData === 'object' && remoteData.admin) {
+          this.db = remoteData;
+          this.normalizeDb();
+          this.lastSupabaseSync = Date.now();
+          this.isModified = false;
+        }
+      } catch (err) {
+        console.warn('[Supabase Sync Warn]:', err);
+      } finally {
+        this.inFlightSync = null;
+      }
+    })();
+
+    return this.inFlightSync;
   }
 
   public async flushToSupabase(): Promise<boolean> {

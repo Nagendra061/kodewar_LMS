@@ -19,6 +19,14 @@ async function startServer() {
   // Attach auth context to every request
   app.use(authMiddleware);
 
+  // Disable caching on API routes
+  app.use('/api', (req, res, next) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    next();
+  });
+
   // Mount API router
   app.use('/api', apiRouter);
 
