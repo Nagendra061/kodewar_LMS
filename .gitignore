@@ -8,3 +8,4 @@ coverage/
 *.backup.json
 .env*
 !.env.example
+workflow.json

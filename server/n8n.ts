@@ -48,6 +48,31 @@ export async function triggerN8nCandidateOnboarding(
     };
   }
 
+  // Detect common configuration mistakes on Vercel Production
+  if (webhookUrl.includes('localhost') || webhookUrl.includes('127.0.0.1')) {
+    const errorMsg =
+      `Invalid Webhook URL: "${webhookUrl}". Vercel is running in the cloud and cannot reach "localhost" on your computer. ` +
+      `Please expose your local n8n using ngrok (e.g. "npx ngrok http 5678") or use a hosted n8n instance, then update N8N_WEBHOOK_URL on Vercel.`;
+    console.error(`[n8n Automation Config Error]: ${errorMsg}`);
+    return {
+      triggered: false,
+      success: false,
+      message: errorMsg,
+    };
+  }
+
+  if (webhookUrl.includes('your-n8n-instance.com') || webhookUrl.includes('example.com')) {
+    const errorMsg =
+      `N8N_WEBHOOK_URL is still set to the documentation placeholder "${webhookUrl}". ` +
+      `Please replace it with your actual n8n webhook URL in your Vercel Environment Variables and redeploy.`;
+    console.error(`[n8n Automation Config Error]: ${errorMsg}`);
+    return {
+      triggered: false,
+      success: false,
+      message: errorMsg,
+    };
+  }
+
   const normalizedPayload = {
     // Exact placeholder keys requested
     event_type: payload.eventType,
@@ -134,16 +159,24 @@ export async function triggerN8nCandidateOnboarding(
   } catch (err: any) {
     clearTimeout(timeoutId);
     const isAbort = err.name === 'AbortError';
+    const causeDetail = err.cause
+      ? ` (${err.cause.code || err.cause.message || JSON.stringify(err.cause)})`
+      : '';
     const errorMsg = isAbort
       ? 'n8n webhook request timed out after 8000ms.'
-      : err.message || 'Unknown network error';
+      : `${err.message || 'Unknown network error'}${causeDetail}`;
 
     console.error(`[n8n Automation Network Failure]: ${errorMsg}`);
+
+    let hint = '';
+    if (errorMsg.includes('fetch failed')) {
+      hint = ' Ensure your n8n instance is publicly accessible, running, and the workflow is Active.';
+    }
 
     return {
       triggered: true,
       success: false,
-      message: `Failed to dispatch to n8n webhook: ${errorMsg}`,
+      message: `Failed to dispatch to n8n webhook: ${errorMsg}.${hint}`,
     };
   }
 }
