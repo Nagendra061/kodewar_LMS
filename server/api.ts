@@ -28,6 +28,7 @@ import type {
   Tutor,
   EmailLog,
 } from '../src/types/index.ts';
+import { triggerN8nCandidateOnboarding } from './n8n.ts';
 
 export const apiRouter = Router();
 
@@ -420,7 +421,7 @@ apiRouter.get('/candidates/:id', requireAdmin, (req, res) => {
   });
 });
 
-apiRouter.post('/candidates', requireAdmin, (req: AuthenticatedRequest, res) => {
+apiRouter.post('/candidates', requireAdmin, async (req: AuthenticatedRequest, res) => {
   const { name, email, phone, courseId, batchId, enrollmentDate, status, remarks, candidateId } = req.body;
 
   if (!name || !email || !courseId || !batchId) {
@@ -525,6 +526,20 @@ apiRouter.post('/candidates', requireAdmin, (req: AuthenticatedRequest, res) => 
 
   dbManager.save();
 
+  // Trigger n8n Automated Candidate Onboarding Email Workflow
+  const baseUrl = process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
+  const n8nStatus = await triggerN8nCandidateOnboarding({
+    eventType: 'candidate_created',
+    userName: newCandidate.name,
+    userCourse: course.name,
+    userEmail: newCandidate.email,
+    tempPassword,
+    candidateId: newCandidate.candidateId,
+    enrollmentDate: newCandidate.enrollmentDate,
+    adminEmail: req.user?.email,
+    loginUrl: `${baseUrl}`,
+  });
+
   res.status(201).json({
     candidate: {
       ...newCandidate,
@@ -534,6 +549,7 @@ apiRouter.post('/candidates', requireAdmin, (req: AuthenticatedRequest, res) => 
       salt: undefined,
     },
     tempPassword,
+    n8nStatus,
   });
 });
 
@@ -671,13 +687,16 @@ apiRouter.delete('/candidates/:id', requireAdmin, async (req: AuthenticatedReque
   res.json({ success: true, message: `Candidate ${cand.name} deleted successfully.` });
 });
 
-apiRouter.post('/candidates/:id/resend-activation', requireAdmin, (req: AuthenticatedRequest, res) => {
+apiRouter.post('/candidates/:id/resend-activation', requireAdmin, async (req: AuthenticatedRequest, res) => {
   const db = dbManager.get();
   const cand = db.candidates.find((c) => c.id === req.params.id);
   if (!cand) {
     res.status(404).json({ error: 'Candidate not found.' });
     return;
   }
+
+  const course = db.courses.find((cr) => cr.id === cand.courseId);
+  const courseName = course?.name || 'Internship Training Program';
 
   const tempPassword = `Pass@${Math.floor(1000 + Math.random() * 9000)}`;
   cand.tempPassword = tempPassword;
@@ -702,7 +721,54 @@ apiRouter.post('/candidates/:id/resend-activation', requireAdmin, (req: Authenti
     `Resent activation credentials to ${cand.email}.`
   );
 
-  res.json({ success: true, message: 'Activation email queued.', tempPassword });
+  if (isSupabaseConnected()) {
+    await dbManager.flushToSupabase();
+  }
+
+  // Trigger n8n Automated Candidate Onboarding Email Workflow
+  const baseUrl = process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
+  const n8nStatus = await triggerN8nCandidateOnboarding({
+    eventType: 'resend_activation',
+    userName: cand.name,
+    userCourse: courseName,
+    userEmail: cand.email,
+    tempPassword,
+    candidateId: cand.candidateId,
+    enrollmentDate: cand.enrollmentDate,
+    adminEmail: req.user?.email,
+    loginUrl: `${baseUrl}`,
+  });
+
+  res.json({
+    success: true,
+    message: 'Activation credentials updated and n8n onboarding email triggered.',
+    tempPassword,
+    n8nStatus,
+  });
+});
+
+// Test n8n Webhook Connection (Admin only)
+apiRouter.post('/n8n/test', requireAdmin, async (req: AuthenticatedRequest, res) => {
+  const baseUrl = process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
+  const testEmail = req.body.email || req.user?.email || 'admin@kodewar.com';
+
+  const n8nStatus = await triggerN8nCandidateOnboarding({
+    eventType: 'candidate_created',
+    userName: req.body.name || 'Sample Intern',
+    userCourse: req.body.course || 'Full Stack Web Development',
+    userEmail: testEmail,
+    tempPassword: 'Pass@Test2026',
+    candidateId: 'KDL-TEST-001',
+    enrollmentDate: new Date().toISOString().split('T')[0],
+    adminEmail: req.user?.email,
+    loginUrl: `${baseUrl}`,
+  });
+
+  res.json({
+    success: n8nStatus.success,
+    message: n8nStatus.message,
+    n8nStatus,
+  });
 });
 
 // CSV / Bulk import preview

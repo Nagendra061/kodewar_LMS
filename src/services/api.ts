@@ -103,7 +103,7 @@ export const api = {
     ),
 
   createCandidate: (data: any) =>
-    request<{ candidate: CandidateUser; tempPassword?: string }>('/candidates', {
+    request<{ candidate: CandidateUser; tempPassword?: string; n8nStatus?: any }>('/candidates', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
@@ -120,8 +120,17 @@ export const api = {
     }),
 
   resendCandidateActivation: (id: string) =>
-    request<{ success: boolean; tempPassword: string }>(`/candidates/${id}/resend-activation`, {
+    request<{ success: boolean; tempPassword: string; message: string; n8nStatus?: any }>(
+      `/candidates/${id}/resend-activation`,
+      {
+        method: 'POST',
+      }
+    ),
+
+  testN8nWebhook: (data?: { email?: string; name?: string; course?: string }) =>
+    request<{ success: boolean; message: string; n8nStatus: any }>('/n8n/test', {
       method: 'POST',
+      body: JSON.stringify(data || {}),
     }),
 
   importPreview: (rows: any[], defaultCourseId?: string, defaultBatchId?: string) =>

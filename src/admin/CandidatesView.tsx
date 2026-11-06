@@ -55,6 +55,7 @@ export const CandidatesView: React.FC = () => {
   const [formError, setFormError] = useState<string | null>(null);
   const [formSuccess, setFormSuccess] = useState<string | null>(null);
   const [createdCredentials, setCreatedCredentials] = useState<{ id: string; tempPass: string } | null>(null);
+  const [resendingId, setResendingId] = useState<string | null>(null);
 
   // Bulk import state
   const [importTab, setImportTab] = useState<'upload' | 'text'>('upload');
@@ -128,7 +129,13 @@ export const CandidatesView: React.FC = () => {
         remarks: newRemarks,
       });
 
-      setFormSuccess(`Candidate ${res.candidate.name} created successfully.`);
+      const n8nInfo = res.n8nStatus?.success
+        ? ' (Automated onboarding email triggered via n8n)'
+        : res.n8nStatus?.message
+        ? ` (n8n: ${res.n8nStatus.message})`
+        : '';
+
+      setFormSuccess(`Candidate ${res.candidate.name} created successfully.${n8nInfo}`);
       setCreatedCredentials({
         id: res.candidate.candidateId,
         tempPass: res.tempPassword || 'Pass@2026',
@@ -153,11 +160,22 @@ export const CandidatesView: React.FC = () => {
 
   const handleResendActivation = async (candidateId: string) => {
     try {
+      setResendingId(candidateId);
       const res = await api.resendCandidateActivation(candidateId);
-      alert(`Activation instructions resent to candidate email.\nNew Temporary Password: ${res.tempPassword}`);
+      const n8nNotice = res.n8nStatus?.success
+        ? '\n\n✓ n8n automated onboarding email workflow executed successfully!'
+        : res.n8nStatus?.message
+        ? `\n\nℹ n8n status: ${res.n8nStatus.message}`
+        : '';
+      alert(`Activation instructions resent to candidate email.\nNew Temporary Password: ${res.tempPassword}${n8nNotice}`);
       loadAll();
+      if (selectedCandidate && selectedCandidate.candidate.id === candidateId) {
+        handleOpenDetails(candidateId);
+      }
     } catch (err: any) {
       alert(err.message || 'Failed to resend activation');
+    } finally {
+      setResendingId(null);
     }
   };
 
@@ -555,15 +573,16 @@ Rohan Verma,rohan.verma@example.com,+91 9876543212,KDL-2026-003,Frontend special
                         >
                           <Edit2 className="w-4 h-4" />
                         </button>
-                        {cand.status === 'pending_activation' && (
-                          <button
-                            onClick={() => handleResendActivation(cand.id)}
-                            title="Resend Activation Credentials"
-                            className="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-blue-600 dark:text-blue-400"
-                          >
-                            <Mail className="w-4 h-4" />
-                          </button>
-                        )}
+                        <button
+                          onClick={() => handleResendActivation(cand.id)}
+                          disabled={resendingId === cand.id}
+                          title="Resend Onboarding Email (Triggers n8n Workflow)"
+                          className={`p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-blue-600 dark:text-blue-400 disabled:opacity-50 transition ${
+                            resendingId === cand.id ? 'animate-pulse' : ''
+                          }`}
+                        >
+                          <Mail className="w-4 h-4" />
+                        </button>
                         <button
                           onClick={() => handleDeleteCandidate(cand.id, cand.name)}
                           title="Delete Candidate"
@@ -607,7 +626,7 @@ Rohan Verma,rohan.verma@example.com,+91 9876543212,KDL-2026-003,Frontend special
               <div className="space-y-4">
                 <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 text-xs text-emerald-800 dark:text-emerald-300 space-y-2">
                   <p className="font-semibold">{formSuccess}</p>
-                  <p>An activation email has been queued in the system email outbox.</p>
+                  <p>Automated onboarding email triggered via n8n workflow to candidate's inbox.</p>
                   <div className="mt-2 p-3 bg-white dark:bg-slate-900 rounded-lg border border-emerald-300 dark:border-emerald-800 font-mono text-xs">
                     <div>Candidate ID: <strong>{createdCredentials.id}</strong></div>
                     <div>Temporary Password: <strong>{createdCredentials.tempPass}</strong></div>
@@ -1200,6 +1219,18 @@ Rohan Verma,rohan.verma@example.com,+91 9876543212,KDL-2026-003,Frontend special
                 <span className="capitalize font-medium">
                   {selectedCandidate.candidate.status.replace('_', ' ')}
                 </span>
+              </div>
+
+              {/* Quick Actions */}
+              <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  onClick={() => handleResendActivation(selectedCandidate.candidate.id)}
+                  disabled={resendingId === selectedCandidate.candidate.id}
+                  className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/50 text-xs font-semibold border border-blue-200 dark:border-blue-800 transition disabled:opacity-50"
+                >
+                  <Mail className="w-3.5 h-3.5" />
+                  {resendingId === selectedCandidate.candidate.id ? 'Triggering n8n Workflow...' : 'Resend Onboarding Email (via n8n)'}
+                </button>
               </div>
             </div>
 

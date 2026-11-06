@@ -1,0 +1,206 @@
+{
+  "name": "Kodewar Technologies - Candidate Onboarding Email Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "candidate-onboarding",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "11111111-1111-1111-1111-111111111111",
+      "name": "Candidate Onboarding Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        220,
+        300
+      ],
+      "webhookId": "kodewar-candidate-onboarding-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Validate & Normalize Candidate Payload from Vercel\nconst raw = items[0].json.body || items[0].json;\n\nconst userName = String(raw.user_name || raw.userName || raw.name || '').trim();\nconst userEmail = String(raw.user_email || raw.userEmail || raw.email || '').trim().toLowerCase();\nconst userCourse = String(raw.user_course || raw.userCourse || raw.course || 'Internship Training Program').trim();\nconst tempPassword = String(raw.temp_password || raw.tempPassword || raw.password || '').trim();\nconst candidateId = String(raw.candidate_id || raw.candidateId || '').trim();\nconst eventType = String(raw.event_type || raw.eventType || 'candidate_created').trim();\nconst loginUrl = String(raw.login_url || raw.loginUrl || 'https://kodewar.vercel.app/login').trim();\nconst adminEmail = String(raw.admin_email || raw.adminEmail || 'admin@kodewar.com').trim();\n\nif (!userEmail) {\n  throw new Error('Validation Error: user_email is required');\n}\nif (!userName) {\n  throw new Error('Validation Error: user_name is required');\n}\nif (!tempPassword) {\n  throw new Error('Validation Error: temp_password is required');\n}\n\nreturn [{\n  json: {\n    user_name: userName,\n    user_email: userEmail,\n    user_course: userCourse,\n    temp_password: tempPassword,\n    candidate_id: candidateId,\n    event_type: eventType,\n    login_url: loginUrl,\n    admin_email: adminEmail,\n    is_resend: eventType === 'resend_activation',\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "22222222-2222-2222-2222-222222222222",
+      "name": "Validate & Prepare Candidate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Personalize onboarding instructions for intern {{ $json.user_name }} enrolled in {{ $json.user_course }}. Verify credentials formatting and generate a warm, encouraging welcome tone tailored to their internship journey.",
+        "options": {
+          "systemMessage": "You are the Kodewar Technologies AI Onboarding Agent. Kodewar Technologies (Learn. Build. Grow.) is a technology training firm.\nEnsure all candidate details (Username, Course, Email, Temporary Password) are accurately organized and provide an encouraging, professional welcoming tone."
+        }
+      },
+      "id": "33333333-3333-3333-3333-333333333333",
+      "name": "Onboarding AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        720,
+        300
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-1.5-flash"
+      },
+      "id": "44444444-4444-4444-4444-444444444444",
+      "name": "Google Gemini Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        720,
+        500
+      ],
+      "credentials": {
+        "googleGeminiApi": {
+          "id": "googleGeminiApi",
+          "name": "Google Gemini API account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build exact requested email markdown and modern responsive HTML\nconst item = items[0].json;\n\nconst userName = item.user_name || 'Candidate';\nconst userCourse = item.user_course || 'Internship Training Program';\nconst userEmail = item.user_email;\nconst tempPassword = item.temp_password;\nconst loginUrl = item.login_url || 'https://kodewar.vercel.app/login';\nconst isResend = item.is_resend || item.event_type === 'resend_activation';\n\n// Exact Markdown Template matching specification\nconst markdownContent = `Hi ${userName},\n\nWelcome to **Kodewar Technologies!** 🎉\n\nWe're excited to have you join us as an intern. We're looking forward to being part of your learning journey and helping you grow your skills.\n\n### Your Account Details\n\n**Username:** ${userName}  \n**Course:** ${userCourse}  \n**Email:** ${userEmail}  \n**Temporary Password:** ${tempPassword}\n\n### Important: Activate Your Account\n\nTo activate your account, please log in using the credentials above and **change your temporary password immediately**.\n\nFor security reasons, we recommend choosing a strong and unique password.\n\nWe're happy to have you on board. Wishing you an exciting and successful internship journey with Kodewar Technologies!\n\nBest Regards,  \n**Team Kodewar Technologies**  \n*Learn. Build. Grow.*`;\n\n// Responsive, production-grade branded HTML Email Template\nconst htmlContent = `<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <title>Welcome to Kodewar Technologies</title>\n</head>\n<body style=\"margin: 0; padding: 0; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b;\">\n  <table width=\"100%\" border=\"0\" cellspacing=\"0\" cellpadding=\"0\" style=\"background-color: #f1f5f9; padding: 32px 16px;\">\n    <tr>\n      <td align=\"center\">\n        <table width=\"100%\" border=\"0\" cellspacing=\"0\" cellpadding=\"0\" style=\"max-width: 600px; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.04); border: 1px solid #e2e8f0;\">\n          \n          <!-- Header / Brand Banner -->\n          <tr>\n            <td style=\"background: linear-gradient(135deg, #1e1b4b 0%, #312e81 60%, #4338ca 100%); padding: 36px 32px; text-align: left;\">\n              <table width=\"100%\" border=\"0\" cellspacing=\"0\" cellpadding=\"0\">\n                <tr>\n                  <td>\n                    <span style=\"display: inline-block; padding: 4px 12px; background: rgba(255, 255, 255, 0.15); border-radius: 9999px; font-size: 11px; font-weight: 600; color: #a5b4fc; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px;\">\n                      ${isResend ? 'Account Credentials Resent' : 'Intern Onboarding'}\n                    </span>\n                    <h1 style=\"margin: 0; font-size: 24px; font-weight: 800; color: #ffffff; letter-spacing: -0.02em;\">\n                      Kodewar Technologies\n                    </h1>\n                    <p style=\"margin: 4px 0 0 0; font-size: 13px; color: #c7d2fe; font-style: italic;\">\n                      Learn. Build. Grow.\n                    </p>\n                  </td>\n                </tr>\n              </table>\n            </td>\n          </tr>\n\n          <!-- Body Content -->\n          <tr>\n            <td style=\"padding: 36px 32px;\">\n              <p style=\"margin: 0 0 16px 0; font-size: 16px; line-height: 1.6; color: #0f172a;\">\n                Hi <strong>${userName}</strong>,\n              </p>\n              \n              <p style=\"margin: 0 0 16px 0; font-size: 15px; line-height: 1.6; color: #334155;\">\n                Welcome to <strong>Kodewar Technologies!</strong> 🎉\n              </p>\n              \n              <p style=\"margin: 0 0 24px 0; font-size: 15px; line-height: 1.6; color: #475569;\">\n                We're excited to have you join us as an intern. We're looking forward to being part of your learning journey and helping you grow your skills.\n              </p>\n\n              <!-- Account Details Card -->\n              <table width=\"100%\" border=\"0\" cellspacing=\"0\" cellpadding=\"0\" style=\"background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; margin-bottom: 24px; overflow: hidden;\">\n                <tr>\n                  <td style=\"padding: 16px 20px; background: #f1f5f9; border-bottom: 1px solid #e2e8f0;\">\n                    <h3 style=\"margin: 0; font-size: 14px; font-weight: 700; color: #1e293b; text-transform: uppercase; letter-spacing: 0.05em;\">\n                      Your Account Details\n                    </h3>\n                  </td>\n                </tr>\n                <tr>\n                  <td style=\"padding: 20px;\">\n                    <table width=\"100%\" border=\"0\" cellspacing=\"0\" cellpadding=\"0\" style=\"font-size: 14px;\">\n                      <tr>\n                        <td style=\"padding: 6px 0; color: #64748b; width: 40%; font-weight: 500;\">Username:</td>\n                        <td style=\"padding: 6px 0; color: #0f172a; font-weight: 600;\">${userName}</td>\n                      </tr>\n                      <tr>\n                        <td style=\"padding: 6px 0; color: #64748b; font-weight: 500;\">Course:</td>\n                        <td style=\"padding: 6px 0; color: #0f172a; font-weight: 600;\">${userCourse}</td>\n                      </tr>\n                      <tr>\n                        <td style=\"padding: 6px 0; color: #64748b; font-weight: 500;\">Email:</td>\n                        <td style=\"padding: 6px 0; color: #0f172a; font-weight: 600;\">${userEmail}</td>\n                      </tr>\n                      <tr>\n                        <td style=\"padding: 6px 0; color: #64748b; font-weight: 500;\">Temporary Password:</td>\n                        <td style=\"padding: 6px 0;\">\n                          <span style=\"display: inline-block; padding: 4px 10px; background: #e0e7ff; color: #3730a3; font-family: 'Courier New', Courier, monospace; font-size: 14px; font-weight: 700; border-radius: 6px; border: 1px solid #c7d2fe;\">\n                            ${tempPassword}\n                          </span>\n                        </td>\n                      </tr>\n                    </table>\n                  </td>\n                </tr>\n              </table>\n\n              <!-- Important Notice Card -->\n              <table width=\"100%\" border=\"0\" cellspacing=\"0\" cellpadding=\"0\" style=\"background: #fffbeb; border-left: 4px solid #f59e0b; border-radius: 0 8px 8px 0; margin-bottom: 28px;\">\n                <tr>\n                  <td style=\"padding: 16px 20px;\">\n                    <h4 style=\"margin: 0 0 6px 0; font-size: 14px; font-weight: 700; color: #92400e;\">\n                      Important: Activate Your Account\n                    </h4>\n                    <p style=\"margin: 0 0 6px 0; font-size: 13px; line-height: 1.5; color: #78350f;\">\n                      To activate your account, please log in using the credentials above and <strong>change your temporary password immediately</strong>.\n                    </p>\n                    <p style=\"margin: 0; font-size: 12px; color: #92400e;\">\n                      For security reasons, we recommend choosing a strong and unique password.\n                    </p>\n                  </td>\n                </tr>\n              </table>\n\n              <!-- Login CTA Button -->\n              <table width=\"100%\" border=\"0\" cellspacing=\"0\" cellpadding=\"0\" style=\"margin-bottom: 28px;\">\n                <tr>\n                  <td align=\"center\">\n                    <a href=\"${loginUrl}\" target=\"_blank\" style=\"display: inline-block; padding: 14px 32px; background: #4338ca; color: #ffffff; text-decoration: none; font-size: 15px; font-weight: 600; border-radius: 10px; box-shadow: 0 4px 6px -1px rgba(67, 56, 202, 0.3);\">\n                      Log In to Activate Account &rarr;\n                    </a>\n                  </td>\n                </tr>\n              </table>\n\n              <p style=\"margin: 0 0 24px 0; font-size: 14px; line-height: 1.6; color: #475569;\">\n                We're happy to have you on board. Wishing you an exciting and successful internship journey with Kodewar Technologies!\n              </p>\n\n              <table width=\"100%\" border=\"0\" cellspacing=\"0\" cellpadding=\"0\" style=\"border-top: 1px solid #e2e8f0; padding-top: 20px;\">\n                <tr>\n                  <td>\n                    <p style=\"margin: 0; font-size: 14px; color: #334155;\">Best Regards,</p>\n                    <p style=\"margin: 2px 0 0 0; font-size: 15px; font-weight: 700; color: #0f172a;\">Team Kodewar Technologies</p>\n                    <p style=\"margin: 2px 0 0 0; font-size: 13px; color: #64748b; font-style: italic;\">Learn. Build. Grow.</p>\n                  </td>\n                </tr>\n              </table>\n            </td>\n          </tr>\n\n          <!-- Footer -->\n          <tr>\n            <td style=\"background: #f8fafc; padding: 20px 32px; text-align: center; border-top: 1px solid #e2e8f0;\">\n              <p style=\"margin: 0; font-size: 12px; color: #94a3b8;\">\n                &copy; ${new Date().getFullYear()} Kodewar Technologies. All rights reserved.\n              </p>\n            </td>\n          </tr>\n\n        </table>\n      </td>\n    </tr>\n  </table>\n</body>\n</html>`;\n\nconst subject = isResend\n  ? `Your Account Credentials - Kodewar Technologies`\n  : `Welcome to Kodewar Technologies! 🎉 Your Account Details`;\n\nreturn [{\n  json: {\n    ...item,\n    subject,\n    markdown_content: markdownContent,\n    html_content: htmlContent\n  }\n}];"
+      },
+      "id": "55555555-5555-5555-5555-555555555555",
+      "name": "Build Email Markdown & HTML",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        980,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "onboarding@kodewar.com",
+        "toEmail": "={{ $json.user_email }}",
+        "subject": "={{ $json.subject }}",
+        "text": "={{ $json.markdown_content }}",
+        "html": "={{ $json.html_content }}",
+        "options": {}
+      },
+      "id": "66666666-6666-6666-6666-666666666666",
+      "name": "Send Onboarding Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1220,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": true,\n  \"message\": \"Candidate onboarding email delivered successfully via n8n\",\n  \"candidate_id\": \"{{ $json.candidate_id }}\",\n  \"user_email\": \"{{ $json.user_email }}\",\n  \"event_type\": \"{{ $json.event_type }}\",\n  \"subject\": \"{{ $json.subject }}\",\n  \"timestamp\": \"{{ $now.toISO() }}\"\n}",
+        "options": {}
+      },
+      "id": "77777777-7777-7777-7777-777777777777",
+      "name": "Respond to Vercel LMS",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1460,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Candidate Onboarding Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate & Prepare Candidate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate & Prepare Candidate": {
+      "main": [
+        [
+          {
+            "node": "Onboarding AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Onboarding AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Onboarding AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Build Email Markdown & HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Email Markdown & HTML": {
+      "main": [
+        [
+          {
+            "node": "Send Onboarding Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Onboarding Email": {
+      "main": [
+        [
+          {
+            "node": "Respond to Vercel LMS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {
+    "Candidate Onboarding Webhook": [
+      {
+        "body": {
+          "event_type": "candidate_created",
+          "user_name": "Aarav Sharma",
+          "user_course": "Full Stack Web Development",
+          "user_email": "aarav.sharma@example.com",
+          "temp_password": "Pass@2026",
+          "candidate_id": "KDL-2026-001",
+          "login_url": "https://kodewar.vercel.app/login",
+          "enrollment_date": "2026-11-05",
+          "admin_email": "admin@kodewar.com"
+        }
+      }
+    ]
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
