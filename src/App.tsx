@@ -18,6 +18,7 @@ import { BatchesView } from './admin/BatchesView.tsx';
 import { TutorsView } from './admin/TutorsView.tsx';
 import { MeetingSchedulerView } from './admin/MeetingSchedulerView.tsx';
 import { AttendanceView } from './admin/AttendanceView.tsx';
+import { LeaveManagementView } from './admin/features/leave-management/LeaveManagementView.tsx';
 import { ResourcesView } from './admin/ResourcesView.tsx';
 import { NotificationsView } from './admin/NotificationsView.tsx';
 import { ReportsView } from './admin/ReportsView.tsx';
@@ -30,8 +31,20 @@ import { CandidateDashboard } from './candidate/CandidateDashboard.tsx';
 import { CandidateMeetingsView } from './candidate/CandidateMeetingsView.tsx';
 import { CandidateResourcesView } from './candidate/CandidateResourcesView.tsx';
 import { CandidateAttendanceView } from './candidate/CandidateAttendanceView.tsx';
+import { MyLeaveView } from './candidate/features/my-leave/MyLeaveView.tsx';
 import { CandidateNotificationsView } from './candidate/CandidateNotificationsView.tsx';
 import { CandidateProfileView } from './candidate/CandidateProfileView.tsx';
+
+// Tutor Views
+import { TutorSidebar, TutorTab } from './tutor/TutorSidebar.tsx';
+import { TutorDashboard } from './tutor/TutorDashboard.tsx';
+import { TutorBatchesView } from './tutor/TutorBatchesView.tsx';
+import { TutorMeetingsView } from './tutor/TutorMeetingsView.tsx';
+import { TutorAttendanceView } from './tutor/TutorAttendanceView.tsx';
+import { TutorResourcesView } from './tutor/TutorResourcesView.tsx';
+import { TutorNotificationsView } from './tutor/TutorNotificationsView.tsx';
+import { TutorProfileView } from './tutor/TutorProfileView.tsx';
+import { TutorLeaveView } from './tutor/TutorLeaveView.tsx';
 
 import { Menu, X } from 'lucide-react';
 
@@ -43,6 +56,7 @@ const ADMIN_TABS: AdminTab[] = [
   'candidates',
   'meetings',
   'attendance',
+  'leave-management',
   'resources',
   'notifications',
   'reports',
@@ -55,11 +69,24 @@ const CANDIDATE_TABS: CandidateTab[] = [
   'meetings',
   'resources',
   'attendance',
+  'my-leave',
   'notifications',
   'profile',
 ];
 
-function getInitialTab<T extends string>(role: 'admin' | 'candidate', validTabs: T[]): T {
+const TUTOR_TABS: TutorTab[] = [
+  'dashboard',
+  'batches',
+  'meetings',
+  'attendance',
+  'resources',
+  'leave',
+  'notifications',
+  'profile',
+  'settings',
+];
+
+function getInitialTab<T extends string>(role: 'admin' | 'candidate' | 'tutor', validTabs: T[]): T {
   try {
     const params = new URLSearchParams(window.location.search);
     const tabParam = params.get('tab');
@@ -85,6 +112,8 @@ const MainApp: React.FC = () => {
   const { user, isLoading } = useAuth();
   const [adminTab, setAdminTab] = useState<AdminTab>(() => getInitialTab('admin', ADMIN_TABS));
   const [candidateTab, setCandidateTab] = useState<CandidateTab>(() => getInitialTab('candidate', CANDIDATE_TABS));
+  const [tutorTab, setTutorTab] = useState<TutorTab>(() => getInitialTab('tutor', TUTOR_TABS));
+  const [attendanceTargetSessionId, setAttendanceTargetSessionId] = useState<string | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const navigateAdmin = (tab: AdminTab) => {
@@ -111,10 +140,27 @@ const MainApp: React.FC = () => {
     } catch {}
   };
 
+  const navigateTutor = (tab: TutorTab) => {
+    setTutorTab(tab);
+    try {
+      localStorage.setItem('kodewar_tutor_tab', tab);
+      const url = new URL(window.location.href);
+      if (url.searchParams.get('tab') !== tab) {
+        url.searchParams.set('tab', tab);
+        window.history.pushState({ tab }, '', url.toString());
+      }
+    } catch {}
+  };
+
   // Keep URL in sync with active tab on mount or tab change
   useEffect(() => {
     if (!user) return;
-    const current = user.role === 'admin' ? adminTab : candidateTab;
+    const current =
+      user.role === 'admin'
+        ? adminTab
+        : user.role === 'tutor'
+        ? tutorTab
+        : candidateTab;
     try {
       const url = new URL(window.location.href);
       if (url.searchParams.get('tab') !== current) {
@@ -122,7 +168,7 @@ const MainApp: React.FC = () => {
         window.history.replaceState({ tab: current }, '', url.toString());
       }
     } catch {}
-  }, [user, adminTab, candidateTab]);
+  }, [user, adminTab, candidateTab, tutorTab]);
 
   // Support browser Back/Forward navigation
   useEffect(() => {
@@ -133,6 +179,9 @@ const MainApp: React.FC = () => {
         if (user?.role === 'admin' && tabParam && ADMIN_TABS.includes(tabParam as AdminTab)) {
           setAdminTab(tabParam as AdminTab);
           localStorage.setItem('kodewar_admin_tab', tabParam);
+        } else if (user?.role === 'tutor' && tabParam && TUTOR_TABS.includes(tabParam as TutorTab)) {
+          setTutorTab(tabParam as TutorTab);
+          localStorage.setItem('kodewar_tutor_tab', tabParam);
         } else if (user?.role === 'candidate' && tabParam && CANDIDATE_TABS.includes(tabParam as CandidateTab)) {
           setCandidateTab(tabParam as CandidateTab);
           localStorage.setItem('kodewar_candidate_tab', tabParam);
@@ -159,13 +208,17 @@ const MainApp: React.FC = () => {
     return <LoginPage />;
   }
 
+  const currentTab =
+    user.role === 'admin' ? adminTab : user.role === 'tutor' ? tutorTab : candidateTab;
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col">
-      {/* Top Header (Top Bar Contract: Brand, Context/Nav, Profile) */}
+      {/* Top Header */}
       <Header
-        currentTab={user.role === 'admin' ? adminTab : candidateTab}
+        currentTab={currentTab}
         onNavigate={(tab) => {
           if (user.role === 'admin') navigateAdmin(tab as AdminTab);
+          else if (user.role === 'tutor') navigateTutor(tab as TutorTab);
           else navigateCandidate(tab as CandidateTab);
         }}
       />
@@ -173,7 +226,7 @@ const MainApp: React.FC = () => {
       {/* Mobile Menu Toggle Bar */}
       <div className="md:hidden flex items-center justify-between px-4 py-2 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
         <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 capitalize">
-          {user.role === 'admin' ? adminTab.replace(/-/g, ' ') : candidateTab.replace(/-/g, ' ')}
+          {currentTab.replace(/-/g, ' ')}
         </span>
         <button
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -189,6 +242,8 @@ const MainApp: React.FC = () => {
         <div className="hidden md:flex relative z-30">
           {user.role === 'admin' ? (
             <AdminSidebar currentTab={adminTab} onSelectTab={navigateAdmin} />
+          ) : user.role === 'tutor' ? (
+            <TutorSidebar currentTab={tutorTab} onSelectTab={navigateTutor} />
           ) : (
             <CandidateSidebar currentTab={candidateTab} onSelectTab={navigateCandidate} />
           )}
@@ -215,6 +270,14 @@ const MainApp: React.FC = () => {
                       setMobileMenuOpen(false);
                     }}
                   />
+                ) : user.role === 'tutor' ? (
+                  <TutorSidebar
+                    currentTab={tutorTab}
+                    onSelectTab={(tab) => {
+                      navigateTutor(tab);
+                      setMobileMenuOpen(false);
+                    }}
+                  />
                 ) : (
                   <CandidateSidebar
                     currentTab={candidateTab}
@@ -231,7 +294,7 @@ const MainApp: React.FC = () => {
 
         {/* Content Viewport */}
         <main className="flex-1 overflow-y-auto relative">
-          {/* Light Watermark Overlay across all sections & cards on both Admin & Candidate portals */}
+          {/* Light Watermark Overlay across all sections & cards on all portals */}
           <div
             aria-hidden="true"
             className="pointer-events-none fixed inset-0 flex items-center justify-center z-20 overflow-hidden select-none md:left-64"
@@ -253,11 +316,32 @@ const MainApp: React.FC = () => {
                 {adminTab === 'tutors' && <TutorsView />}
                 {adminTab === 'meetings' && <MeetingSchedulerView />}
                 {adminTab === 'attendance' && <AttendanceView />}
+                {adminTab === 'leave-management' && <LeaveManagementView />}
                 {adminTab === 'resources' && <ResourcesView />}
                 {adminTab === 'notifications' && <NotificationsView />}
                 {adminTab === 'reports' && <ReportsView />}
                 {/* {adminTab === 'audit-logs' && <AuditLogsView />} */}
                 {adminTab === 'settings' && <SettingsView />}
+              </>
+            ) : user.role === 'tutor' ? (
+              <>
+                {tutorTab === 'dashboard' && <TutorDashboard onNavigate={navigateTutor} />}
+                {tutorTab === 'batches' && <TutorBatchesView />}
+                {tutorTab === 'meetings' && (
+                  <TutorMeetingsView
+                    onSelectMeetingForAttendance={(sessionId) => {
+                      setAttendanceTargetSessionId(sessionId);
+                      navigateTutor('attendance');
+                    }}
+                  />
+                )}
+                {tutorTab === 'attendance' && (
+                  <TutorAttendanceView initialSessionId={attendanceTargetSessionId} />
+                )}
+                {tutorTab === 'resources' && <TutorResourcesView />}
+                {tutorTab === 'leave' && <TutorLeaveView />}
+                {tutorTab === 'notifications' && <TutorNotificationsView />}
+                {(tutorTab === 'profile' || tutorTab === 'settings') && <TutorProfileView />}
               </>
             ) : (
               <>
@@ -265,6 +349,7 @@ const MainApp: React.FC = () => {
                 {candidateTab === 'meetings' && <CandidateMeetingsView />}
                 {candidateTab === 'resources' && <CandidateResourcesView />}
                 {candidateTab === 'attendance' && <CandidateAttendanceView />}
+                {candidateTab === 'my-leave' && <MyLeaveView />}
                 {candidateTab === 'notifications' && <CandidateNotificationsView />}
                 {candidateTab === 'profile' && <CandidateProfileView />}
               </>

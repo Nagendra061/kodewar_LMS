@@ -1,3 +1,6 @@
+import dotenv from 'dotenv';
+dotenv.config();
+
 /**
  * n8n Candidate Onboarding Automation Service
  * Handles secure webhook dispatch to n8n workflow for Kodewar LMS
@@ -32,27 +35,32 @@ export interface N8nTriggerResult {
 export async function triggerN8nCandidateOnboarding(
   payload: CandidateOnboardingPayload
 ): Promise<N8nTriggerResult> {
+  dotenv.config();
   const webhookUrl = process.env.N8N_WEBHOOK_URL?.trim();
   const webhookSecret = process.env.N8N_WEBHOOK_SECRET?.trim();
-  const defaultAppUrl = process.env.APP_URL?.trim() || 'https://kodewar.vercel.app';
+  const isRunningOnVercel = Boolean(process.env.VERCEL);
+  const defaultAppUrl =
+    process.env.APP_URL?.trim() || (isRunningOnVercel ? 'https://kodewar.vercel.app' : 'http://localhost:3000');
 
   if (!webhookUrl) {
     console.warn(
-      '[n8n Automation]: N8N_WEBHOOK_URL is not set in environment variables. ' +
+      '[n8n Automation]: N8N_WEBHOOK_URL is not set in environment variables or .env file. ' +
         'Candidate saved, but automated onboarding email trigger was skipped.'
     );
     return {
       triggered: false,
       success: false,
-      message: 'N8N_WEBHOOK_URL environment variable is not configured on Vercel.',
+      message: isRunningOnVercel
+        ? 'N8N_WEBHOOK_URL environment variable is not configured on Vercel.'
+        : 'N8N_WEBHOOK_URL is not configured in your local .env file.',
     };
   }
 
-  // Detect common configuration mistakes on Vercel Production
-  if (webhookUrl.includes('localhost') || webhookUrl.includes('127.0.0.1')) {
+  // Detect localhost only IF running on Vercel cloud environment
+  if (isRunningOnVercel && (webhookUrl.includes('localhost') || webhookUrl.includes('127.0.0.1'))) {
     const errorMsg =
-      `Invalid Webhook URL: "${webhookUrl}". Vercel is running in the cloud and cannot reach "localhost" on your computer. ` +
-      `Please expose your local n8n using ngrok (e.g. "npx ngrok http 5678") or use a hosted n8n instance, then update N8N_WEBHOOK_URL on Vercel.`;
+      `Invalid Webhook URL for Vercel: "${webhookUrl}". Vercel is in the cloud and cannot reach "localhost" on your computer. ` +
+      `For Vercel production, expose your local n8n using ngrok (e.g. "npx ngrok http 5678") or use a hosted n8n instance, then update N8N_WEBHOOK_URL in Vercel.`;
     console.error(`[n8n Automation Config Error]: ${errorMsg}`);
     return {
       triggered: false,
@@ -64,7 +72,7 @@ export async function triggerN8nCandidateOnboarding(
   if (webhookUrl.includes('your-n8n-instance.com') || webhookUrl.includes('example.com')) {
     const errorMsg =
       `N8N_WEBHOOK_URL is still set to the documentation placeholder "${webhookUrl}". ` +
-      `Please replace it with your actual n8n webhook URL in your Vercel Environment Variables and redeploy.`;
+      `Please replace it with your actual n8n webhook URL.`;
     console.error(`[n8n Automation Config Error]: ${errorMsg}`);
     return {
       triggered: false,
@@ -95,8 +103,8 @@ export async function triggerN8nCandidateOnboarding(
   };
 
   const controller = new AbortController();
-  // 8 second safety timeout for Vercel Serverless execution
-  const timeoutId = setTimeout(() => controller.abort(), 8000);
+  // 30 second safety timeout to allow AI agent processing & email dispatch
+  const timeoutId = setTimeout(() => controller.abort(), 30000);
 
   try {
     const headers: Record<string, string> = {
@@ -163,7 +171,7 @@ export async function triggerN8nCandidateOnboarding(
       ? ` (${err.cause.code || err.cause.message || JSON.stringify(err.cause)})`
       : '';
     const errorMsg = isAbort
-      ? 'n8n webhook request timed out after 8000ms.'
+      ? 'n8n webhook request timed out after 30000ms.'
       : `${err.message || 'Unknown network error'}${causeDetail}`;
 
     console.error(`[n8n Automation Network Failure]: ${errorMsg}`);

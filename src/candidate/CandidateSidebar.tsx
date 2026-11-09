@@ -4,6 +4,7 @@ import {
   Calendar,
   FolderOpen,
   CheckSquare,
+  CalendarClock,
   Bell,
   User,
 } from 'lucide-react';
@@ -13,6 +14,7 @@ export type CandidateTab =
   | 'meetings'
   | 'resources'
   | 'attendance'
+  | 'my-leave'
   | 'notifications'
   | 'profile';
 
@@ -32,6 +34,7 @@ export const CandidateSidebar: React.FC<CandidateSidebarProps> = ({
     { id: 'meetings', label: 'My Meetings', icon: Calendar },
     { id: 'resources', label: 'Documents & Resources', icon: FolderOpen },
     { id: 'attendance', label: 'My Attendance', icon: CheckSquare },
+    { id: 'my-leave', label: 'My Leave', icon: CalendarClock },
     { id: 'notifications', label: 'Notifications', icon: Bell },
     { id: 'profile', label: 'My Profile & Settings', icon: User },
   ];

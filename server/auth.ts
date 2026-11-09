@@ -1,26 +1,26 @@
 import type { Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
-import { dbManager, hashPassword } from './db.ts';
-import type { AuthUser, AdminUser, CandidateUser } from '../src/types/index.ts';
+import { dbManager, hashPassword, getDefaultTutorPermissions } from './db.ts';
+import type { AuthUser, AdminUser, CandidateUser, TutorUser } from '../src/types/index.ts';
 
 // Stateless HMAC token secret (ensures tokens validate across all Vercel serverless containers)
 const SESSION_SECRET = process.env.SESSION_SECRET || 'kodewar-lms-secure-token-secret-2026';
 
 interface Session {
   userId: string;
-  role: 'admin' | 'candidate';
+  role: 'admin' | 'candidate' | 'tutor';
   createdAt: number;
 }
 
 interface TokenPayload {
   userId: string;
-  role: 'admin' | 'candidate';
+  role: 'admin' | 'candidate' | 'tutor';
   exp: number;
 }
 
 const sessions = new Map<string, Session>();
 
-export function generateToken(userId: string, role: 'admin' | 'candidate'): string {
+export function generateToken(userId: string, role: 'admin' | 'candidate' | 'tutor'): string {
   const payload: TokenPayload = {
     userId,
     role,
@@ -44,7 +44,7 @@ export function revokeToken(token: string): void {
   sessions.delete(token);
 }
 
-export function parseToken(token: string): { userId: string; role: 'admin' | 'candidate' } | null {
+export function parseToken(token: string): { userId: string; role: 'admin' | 'candidate' | 'tutor' } | null {
   // 1. Verify stateless HMAC signature (works across all serverless lambda instances)
   try {
     const parts = token.split('.');
@@ -105,6 +105,37 @@ export function getUserFromToken(token: string): AuthUser | null {
         role: 'candidate',
       };
     }
+  } else if (session.role === 'tutor') {
+    const tut = db.tutors.find((t) => t.id === session.userId || t.tutorId === session.userId);
+    if (tut) {
+      const assignedCourseNames = (tut.assignedCourseIds || [])
+        .map((cid) => db.courses.find((c) => c.id === cid)?.name)
+        .filter(Boolean) as string[];
+      const assignedBatchNames = (tut.assignedBatchIds || [])
+        .map((bid) => db.batches.find((b) => b.id === bid)?.name)
+        .filter(Boolean) as string[];
+
+      return {
+        id: tut.id,
+        tutorId: tut.tutorId,
+        name: tut.name,
+        email: tut.email,
+        phone: tut.phone,
+        specialization: tut.specialization,
+        designation: tut.designation,
+        avatarUrl: tut.avatarUrl,
+        status: tut.status,
+        assignedCourseIds: tut.assignedCourseIds || [],
+        assignedCourseNames,
+        assignedBatchIds: tut.assignedBatchIds || [],
+        assignedBatchNames,
+        permissions: tut.permissions || getDefaultTutorPermissions(),
+        mustChangePassword: tut.mustChangePassword,
+        notes: tut.notes,
+        createdAt: tut.createdAt,
+        role: 'tutor',
+      };
+    }
   }
   return null;
 }
@@ -147,6 +178,22 @@ export function requireAdmin(req: AuthenticatedRequest, res: Response, next: Nex
 export function requireCandidate(req: AuthenticatedRequest, res: Response, next: NextFunction): void {
   if (!req.user || req.user.role !== 'candidate') {
     res.status(403).json({ error: 'Candidate authority required' });
+    return;
+  }
+  next();
+}
+
+export function requireTutor(req: AuthenticatedRequest, res: Response, next: NextFunction): void {
+  if (!req.user || req.user.role !== 'tutor') {
+    res.status(403).json({ error: 'Tutor authority required' });
+    return;
+  }
+  next();
+}
+
+export function requireTutorOrAdmin(req: AuthenticatedRequest, res: Response, next: NextFunction): void {
+  if (!req.user || (req.user.role !== 'admin' && req.user.role !== 'tutor')) {
+    res.status(403).json({ error: 'Tutor or Super Admin authority required' });
     return;
   }
   next();

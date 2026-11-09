@@ -12,6 +12,10 @@ import type {
   AuditLog,
   SystemSettings,
   CandidateBatchAssignment,
+  LeaveApplication,
+  LeaveType,
+  LeavePolicy,
+  LeaveStatus,
 } from '../types/index.ts';
 
 const TOKEN_KEY = 'kodewar_auth_token';
@@ -87,10 +91,10 @@ export const api = {
       body: JSON.stringify({ newPassword, currentPassword }),
     }),
 
-  quickSwitch: (role: 'admin' | 'candidate', candidateId?: string) =>
+  quickSwitch: (role: 'admin' | 'candidate' | 'tutor', id?: string) =>
     request<{ token: string; user: AuthUser }>('/auth/quick-switch', {
       method: 'POST',
-      body: JSON.stringify({ role, candidateId }),
+      body: JSON.stringify({ role, candidateId: id, tutorId: id }),
     }),
 
   // Candidates
@@ -223,6 +227,26 @@ export const api = {
     request<{ success: boolean; message: string }>(`/tutors/${id}${cascade ? '?cascade=true' : ''}`, {
       method: 'DELETE',
     }),
+
+  resetTutorPassword: (id: string) =>
+    request<{ success: boolean; tempPassword: string; message: string }>(`/tutors/${id}/reset-password`, {
+      method: 'POST',
+    }),
+
+  getTutorActivity: (id: string) =>
+    request<{
+      tutor: Tutor;
+      activity: {
+        assignedBatchesCount: number;
+        totalCandidates: number;
+        scheduledMeetingsCount: number;
+        completedMeetingsCount: number;
+        attendanceSessionsMarked: number;
+        batches: Batch[];
+        upcomingMeetings: MeetingSession[];
+        completedMeetings: MeetingSession[];
+      };
+    }>(`/tutors/${id}/activity`),
 
   // Meetings
   getMeetings: (params?: { batchId?: string; courseId?: string; tutorId?: string; status?: string }) =>
@@ -447,5 +471,290 @@ export const api = {
     request<{ success: boolean; message: string }>('/supabase/sync', {
       method: 'POST',
       body: JSON.stringify({ direction }),
+    }),
+
+  // Leave Management (Admin & Common)
+  getLeaveTypes: () =>
+    request<{ leaveTypes: LeaveType[] }>('/leave/types'),
+
+  createLeaveType: (data: Partial<LeaveType>) =>
+    request<{ leaveType: LeaveType }>('/leave/types', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateLeaveType: (id: string, data: Partial<LeaveType>) =>
+    request<{ leaveType: LeaveType }>(`/leave/types/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  deleteLeaveType: (id: string) =>
+    request<{ success: boolean; message: string }>(`/leave/types/${id}`, {
+      method: 'DELETE',
+    }),
+
+  getLeavePolicy: () =>
+    request<{ policy: LeavePolicy }>('/leave/policy'),
+
+  updateLeavePolicy: (data: Partial<LeavePolicy>) =>
+    request<{ policy: LeavePolicy }>('/leave/policy', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  getLeaveApplications: (params?: {
+    candidateId?: string;
+    courseId?: string;
+    batchId?: string;
+    leaveTypeId?: string;
+    status?: string;
+    startDate?: string;
+    endDate?: string;
+    search?: string;
+  }) =>
+    request<{
+      applications: LeaveApplication[];
+      summary: {
+        total: number;
+        pending: number;
+        approved: number;
+        rejected: number;
+        cancelled: number;
+        totalApprovedDays: number;
+      };
+    }>(`/leave/applications${toQueryString(params)}`),
+
+  getLeaveApplicationById: (id: string) =>
+    request<{ application: LeaveApplication }>(`/leave/applications/${id}`),
+
+  approveLeave: (id: string, remarks?: string) =>
+    request<{ application: LeaveApplication }>(`/leave/applications/${id}/approve`, {
+      method: 'PUT',
+      body: JSON.stringify({ remarks }),
+    }),
+
+  rejectLeave: (id: string, rejectionReason: string, remarks?: string) =>
+    request<{ application: LeaveApplication }>(`/leave/applications/${id}/reject`, {
+      method: 'PUT',
+      body: JSON.stringify({ rejectionReason, remarks }),
+    }),
+
+  revokeLeave: (id: string, revokeReason: string, remarks?: string) =>
+    request<{ application: LeaveApplication }>(`/leave/applications/${id}/revoke`, {
+      method: 'PUT',
+      body: JSON.stringify({ revokeReason, remarks }),
+    }),
+
+  updateLeaveRemarks: (id: string, remarks: string) =>
+    request<{ application: LeaveApplication }>(`/leave/applications/${id}/remarks`, {
+      method: 'PUT',
+      body: JSON.stringify({ remarks }),
+    }),
+
+  getLeaveReports: () =>
+    request<{
+      reports: {
+        totalApplications: number;
+        totalApprovedDays: number;
+        byStatus: { pending: number; approved: number; rejected: number; cancelled: number };
+        byType: { name: string; count: number; approvedDays: number; color: string }[];
+        byBatch: { batchName: string; courseName: string; totalApps: number; approvedDays: number }[];
+        topCandidates: { candidateName: string; candidateCustomId: string; totalDays: number; appCount: number }[];
+      };
+    }>('/leave/reports'),
+
+  // Leave Management (Candidate)
+  getCandidateLeave: () =>
+    request<{
+      applications: LeaveApplication[];
+      summary: {
+        total: number;
+        pending: number;
+        approved: number;
+        rejected: number;
+        cancelled: number;
+        totalApprovedDays: number;
+      };
+    }>('/candidate/leave'),
+
+  applyCandidateLeave: (data: {
+    leaveTypeId: string;
+    startDate: string;
+    endDate: string;
+    reason: string;
+    attachments?: Array<{ fileName: string; fileSize: number; mimeType: string; dataUrl: string }>;
+  }) =>
+    request<{ application: LeaveApplication }>('/candidate/leave', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  cancelCandidateLeave: (id: string, cancelReason?: string) =>
+    request<{ application: LeaveApplication }>(`/candidate/leave/${id}/cancel`, {
+      method: 'PUT',
+      body: JSON.stringify({ cancelReason }),
+    }),
+
+  // Leave Management (Tutor)
+  getTutorLeave: () =>
+    request<{
+      applications: LeaveApplication[];
+      summary: {
+        total: number;
+        pending: number;
+        approved: number;
+        rejected: number;
+        cancelled: number;
+        totalApprovedDays: number;
+      };
+    }>('/tutor/leave'),
+
+  applyTutorLeave: (data: {
+    leaveTypeId: string;
+    startDate: string;
+    endDate: string;
+    reason: string;
+    attachments?: Array<{ fileName: string; fileSize: number; mimeType: string; dataUrl: string }>;
+  }) =>
+    request<{ application: LeaveApplication }>('/tutor/leave', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  cancelTutorLeave: (id: string, cancelReason?: string) =>
+    request<{ application: LeaveApplication }>(`/tutor/leave/${id}/cancel`, {
+      method: 'PUT',
+      body: JSON.stringify({ cancelReason }),
+    }),
+
+  // Tutor Portal
+  getTutorDashboard: () =>
+    request<{
+      tutor: Tutor;
+      stats: {
+        assignedBatchesCount: number;
+        totalCandidates: number;
+        upcomingMeetingsCount: number;
+        completedMeetingsCount: number;
+        pendingAttendanceCount: number;
+        totalResourcesCount: number;
+      };
+      nextSession: MeetingSession | null;
+      recentMeetings: MeetingSession[];
+      assignedBatches: (Batch & { candidateCount: number; courseName: string })[];
+      unmarkedSessions: MeetingSession[];
+      notifications: AppNotification[];
+    }>('/tutor/dashboard'),
+
+  getTutorBatches: () =>
+    request<{
+      batches: (Batch & {
+        candidateCount: number;
+        courseName: string;
+      })[];
+    }>('/tutor/batches'),
+
+  getTutorBatchById: (id: string) =>
+    request<{
+      batch: Batch;
+      course: Course | null;
+      roster: CandidateUser[];
+      upcomingMeetings: MeetingSession[];
+      completedMeetings: MeetingSession[];
+      resources: ResourceItem[];
+    }>(`/tutor/batches/${id}`),
+
+  getTutorMeetings: (params?: { batchId?: string; status?: string; date?: string }) =>
+    request<{ meetings: MeetingSession[] }>(`/tutor/meetings${toQueryString(params)}`),
+
+  setTutorMeetingAccess: (id: string, accessStatus: 'enabled' | 'disabled') =>
+    request<{ session: MeetingSession }>(`/tutor/meetings/${id}/access`, {
+      method: 'PUT',
+      body: JSON.stringify({ accessStatus }),
+    }),
+
+  getTutorSessionAttendance: (sessionId: string) =>
+    request<{
+      session: MeetingSession;
+      batch: Batch | null;
+      course: Course | null;
+      attendance: AttendanceRecord[];
+      summary: {
+        total: number;
+        present: number;
+        absent: number;
+        late: number;
+        excused: number;
+        unmarked: number;
+      };
+      canEditAttendance: boolean;
+      canRecordAttendance: boolean;
+      isWindowExpired: boolean;
+      windowHours: number;
+    }>(`/tutor/attendance/session/${sessionId}`),
+
+  markTutorAttendance: (
+    sessionId: string,
+    records: Array<{ candidateId: string; status: 'present' | 'absent' | 'late' | 'excused'; remarks?: string }>
+  ) =>
+    request<{ success: boolean; markedCount: number; records: AttendanceRecord[] }>('/tutor/attendance/mark', {
+      method: 'POST',
+      body: JSON.stringify({ sessionId, records }),
+    }),
+
+  correctTutorAttendance: (
+    id: string,
+    data: { status: 'present' | 'absent' | 'late' | 'excused'; remarks?: string; correctionReason: string }
+  ) =>
+    request<{ success: boolean; record: AttendanceRecord }>(`/tutor/attendance/${id}/correct`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  getTutorResources: (params?: { category?: string; batchId?: string }) =>
+    request<{ resources: ResourceItem[] }>(`/tutor/resources${toQueryString(params)}`),
+
+  createTutorResource: (data: {
+    title: string;
+    description?: string;
+    type: 'pdf' | 'link' | 'video' | 'zip' | 'doc';
+    url: string;
+    category: string;
+    courseId?: string;
+    batchId?: string;
+    isRequired?: boolean;
+    tags?: string[];
+  }) =>
+    request<{ resource: ResourceItem }>('/tutor/resources', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  deleteTutorResource: (id: string) =>
+    request<{ success: boolean; message: string }>(`/tutor/resources/${id}`, {
+      method: 'DELETE',
+    }),
+
+  getTutorNotifications: () =>
+    request<{ notifications: AppNotification[] }>('/tutor/notifications'),
+
+  markTutorNotificationRead: (id: string) =>
+    request<{ notification: AppNotification }>(`/tutor/notifications/${id}/read`, {
+      method: 'PUT',
+    }),
+
+  markAllTutorNotificationsRead: () =>
+    request<{ success: boolean }>('/tutor/notifications/read-all', {
+      method: 'PUT',
+    }),
+
+  getTutorProfile: () =>
+    request<{ tutor: Tutor }>('/tutor/profile'),
+
+  updateTutorProfile: (data: Partial<Tutor>) =>
+    request<{ tutor: Tutor }>('/tutor/profile', {
+      method: 'PUT',
+      body: JSON.stringify(data),
     }),
 };

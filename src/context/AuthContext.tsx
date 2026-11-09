@@ -8,7 +8,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: (identifier: string, pass: string) => Promise<void>;
   logout: () => Promise<void>;
-  quickSwitch: (role: 'admin' | 'candidate', candidateId?: string) => Promise<void>;
+  quickSwitch: (role: 'admin' | 'candidate' | 'tutor', id?: string) => Promise<void>;
   updateUserPassword: (newPass: string, currentPass?: string) => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -76,10 +76,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
   };
 
-  const quickSwitch = async (role: 'admin' | 'candidate', candidateId?: string) => {
+  const quickSwitch = async (role: 'admin' | 'candidate' | 'tutor', id?: string) => {
     setIsLoading(true);
     try {
-      const res = await api.quickSwitch(role, candidateId);
+      const res = await api.quickSwitch(role, id);
       setStoredToken(res.token);
       setToken(res.token);
       setUser(res.user);

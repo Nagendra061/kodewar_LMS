@@ -22,6 +22,11 @@ import type {
   EmailLog,
   AuditLog,
   SystemSettings,
+  LeaveApplication,
+  LeaveType,
+  LeavePolicy,
+  TutorPermissions,
+  TutorUser,
 } from '../src/types/index.ts';
 
 export interface DatabaseSchema {
@@ -29,7 +34,7 @@ export interface DatabaseSchema {
   candidates: (CandidateUser & { passwordHash: string; salt: string; tempPassword?: string })[];
   courses: Course[];
   batches: Batch[];
-  tutors: Tutor[];
+  tutors: (Tutor & { passwordHash?: string; salt?: string; tempPassword?: string })[];
   candidateBatchAssignments: CandidateBatchAssignment[];
   meetingSeries: MeetingSeries[];
   meetingSessions: MeetingSession[];
@@ -39,6 +44,94 @@ export interface DatabaseSchema {
   emailLogs: EmailLog[];
   auditLogs: AuditLog[];
   settings: SystemSettings;
+  leaveApplications: LeaveApplication[];
+  leaveTypes: LeaveType[];
+  leavePolicy: LeavePolicy;
+}
+
+export function getDefaultTutorPermissions(): TutorPermissions {
+  return {
+    canViewAssignedBatches: true,
+    canViewAssignedCandidates: true,
+    canViewAssignedMeetings: true,
+    canViewMeetingLinks: true,
+    canManageMeetingAccess: false,
+    canRecordAttendance: false,
+    canEditAttendance: false,
+    canViewResources: true,
+    canUploadResources: false,
+    canManageOwnResources: false,
+    attendanceEditWindowHours: 48,
+  };
+}
+
+export function getDefaultLeaveTypes(): LeaveType[] {
+  return [
+    {
+      id: 'lt-sick',
+      name: 'Sick Leave',
+      code: 'SICK',
+      description: 'Medical illness, health checkup, or doctor-advised rest.',
+      isActive: true,
+      requiresDocument: true,
+      maxDaysPerYear: 12,
+      color: 'rose',
+      createdAt: '2026-11-01T00:00:00.000Z',
+    },
+    {
+      id: 'lt-personal',
+      name: 'Personal Leave',
+      code: 'PERSONAL',
+      description: 'Personal affairs, family events, or unavoidable private matters.',
+      isActive: true,
+      requiresDocument: false,
+      maxDaysPerYear: 10,
+      color: 'blue',
+      createdAt: '2026-11-01T00:00:00.000Z',
+    },
+    {
+      id: 'lt-emergency',
+      name: 'Emergency Leave',
+      code: 'EMERGENCY',
+      description: 'Unforeseen urgent domestic or family emergencies.',
+      isActive: true,
+      requiresDocument: false,
+      maxDaysPerYear: 5,
+      color: 'amber',
+      createdAt: '2026-11-01T00:00:00.000Z',
+    },
+    {
+      id: 'lt-academic',
+      name: 'Academic / Exam Leave',
+      code: 'ACADEMIC',
+      description: 'College examinations, viva, semester tests, or final project submissions.',
+      isActive: true,
+      requiresDocument: false,
+      maxDaysPerYear: 15,
+      color: 'purple',
+      createdAt: '2026-11-01T00:00:00.000Z',
+    },
+    {
+      id: 'lt-other',
+      name: 'Other',
+      code: 'OTHER',
+      description: 'Other verified grounds for absence not categorized above.',
+      isActive: true,
+      requiresDocument: false,
+      maxDaysPerYear: 5,
+      color: 'slate',
+      createdAt: '2026-11-01T00:00:00.000Z',
+    },
+  ];
+}
+
+export function getDefaultLeavePolicy(): LeavePolicy {
+  return {
+    calculationMode: 'working_days', // Excludes weekends (Sat & Sun)
+    allowRetrospective: false, // Disallow start date earlier than current date
+    maxConsecutiveDays: 30,
+    requireAttachmentAboveDays: 2,
+  };
 }
 
 const IS_VERCEL = !!process.env.VERCEL;
@@ -100,6 +193,9 @@ export function createInitialSeed(): DatabaseSchema {
     emailLogs,
     auditLogs,
     settings,
+    leaveApplications: [],
+    leaveTypes: getDefaultLeaveTypes(),
+    leavePolicy: getDefaultLeavePolicy(),
   };
 }
 
@@ -268,6 +364,34 @@ class DatabaseManager {
     if (!Array.isArray(this.db.courses)) this.db.courses = [];
     if (!Array.isArray(this.db.batches)) this.db.batches = [];
     if (!Array.isArray(this.db.tutors)) this.db.tutors = [];
+    // Normalize tutors with credentials & permissions
+    for (const t of this.db.tutors) {
+      if (!t.status) t.status = 'active';
+      if (!Array.isArray(t.assignedCourseIds)) t.assignedCourseIds = [];
+      if (!Array.isArray(t.assignedBatchIds)) t.assignedBatchIds = [];
+      if (!t.permissions) t.permissions = getDefaultTutorPermissions();
+      if (!t.passwordHash) {
+        const salt = crypto.randomBytes(16).toString('hex');
+        t.salt = salt;
+        t.passwordHash = hashPassword('tutor123', salt);
+        t.mustChangePassword = false;
+      }
+      // Reconcile assigned course names
+      t.assignedCourseNames = t.assignedCourseIds
+        .map((cid) => this.db?.courses.find((c) => c.id === cid)?.name)
+        .filter(Boolean) as string[];
+
+      // If tutor has assigned courses but empty assigned batches, auto-associate course batches
+      if (t.assignedBatchIds.length === 0 && t.assignedCourseIds.length > 0) {
+        const matchingBatches = (this.db?.batches || []).filter((b) => t.assignedCourseIds.includes(b.courseId));
+        t.assignedBatchIds = matchingBatches.map((b) => b.id);
+      }
+
+      // Reconcile assigned batch names
+      t.assignedBatchNames = t.assignedBatchIds
+        .map((bid) => this.db?.batches.find((b) => b.id === bid)?.name)
+        .filter(Boolean) as string[];
+    }
     if (!Array.isArray(this.db.candidateBatchAssignments)) this.db.candidateBatchAssignments = [];
     if (!Array.isArray(this.db.meetingSeries)) this.db.meetingSeries = [];
     if (!Array.isArray(this.db.meetingSessions)) this.db.meetingSessions = [];
@@ -276,6 +400,13 @@ class DatabaseManager {
     if (!Array.isArray(this.db.notifications)) this.db.notifications = [];
     if (!Array.isArray(this.db.emailLogs)) this.db.emailLogs = [];
     if (!Array.isArray(this.db.auditLogs)) this.db.auditLogs = [];
+    if (!Array.isArray(this.db.leaveApplications)) this.db.leaveApplications = [];
+    if (!Array.isArray(this.db.leaveTypes) || this.db.leaveTypes.length === 0) {
+      this.db.leaveTypes = getDefaultLeaveTypes();
+    }
+    if (!this.db.leavePolicy) {
+      this.db.leavePolicy = getDefaultLeavePolicy();
+    }
     this.reconcileIntegrity();
   }
 
