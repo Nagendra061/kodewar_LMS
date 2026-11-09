@@ -4,6 +4,7 @@ import { api } from '../services/api.ts';
 import type { MeetingSession, ResourceItem, AppNotification } from '../types/index.ts';
 import {
   Calendar,
+  CalendarClock,
   Clock,
   Radio,
   Video,
@@ -104,14 +105,23 @@ export const CandidateDashboard: React.FC<CandidateDashboardProps> = ({ onNaviga
           </p>
         </div>
 
-        <button
-          onClick={loadData}
-          className="self-start md:self-auto flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors border border-white/10"
-          title="Refresh meeting access state"
-        >
-          <RefreshCw className="w-3.5 h-3.5" />
-          <span>Refresh Status</span>
-        </button>
+        <div className="flex items-center gap-2 self-start md:self-auto">
+          <button
+            onClick={() => onNavigate('my-leave')}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-500 text-white transition-colors shadow-xs"
+          >
+            <CalendarClock className="w-3.5 h-3.5" />
+            <span>Apply Leave</span>
+          </button>
+          <button
+            onClick={loadData}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors border border-white/10"
+            title="Refresh meeting access state"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            <span>Refresh Status</span>
+          </button>
+        </div>
       </div>
 
       {/* Primary Hero Card: Next Scheduled Meeting Spotlight */}

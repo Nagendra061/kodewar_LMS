@@ -7,6 +7,7 @@ import {
   GraduationCap,
   Calendar,
   CheckSquare,
+  CalendarClock,
   FolderOpen,
   Bell,
   BarChart3,
@@ -22,6 +23,7 @@ export type AdminTab =
   | 'candidates'
   | 'meetings'
   | 'attendance'
+  | 'leave-management'
   | 'resources'
   | 'notifications'
   | 'reports'
@@ -42,6 +44,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ currentTab, onSelect
     { id: 'candidates', label: 'Candidates', icon: Users },
     { id: 'meetings', label: 'Meeting Scheduler', icon: Calendar },
     { id: 'attendance', label: 'Attendance', icon: CheckSquare },
+    { id: 'leave-management', label: 'Leave Management', icon: CalendarClock },
     { id: 'resources', label: 'Resources', icon: FolderOpen },
     { id: 'notifications', label: 'Announcements', icon: Bell },
     { id: 'reports', label: 'Reports & Export', icon: BarChart3 },

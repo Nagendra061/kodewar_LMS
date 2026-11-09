@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext.tsx';
-import { Shield, Mail, AlertCircle, ArrowRight, Eye, EyeOff } from 'lucide-react';
+import { Shield, Mail, AlertCircle, ArrowRight, Eye, EyeOff, GraduationCap } from 'lucide-react';
 
 export const LoginPage: React.FC = () => {
   const { login } = useAuth();
@@ -128,7 +128,7 @@ export const LoginPage: React.FC = () => {
           {/* Preset testing logins */}
           <div className="mt-6 pt-5 border-t border-slate-100 dark:border-slate-800">
             <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-2">
-              Super Admin Access
+              Quick Role Switch (Demo Access)
             </p>
             <div className="space-y-1.5">
               <button
@@ -142,9 +142,21 @@ export const LoginPage: React.FC = () => {
                 </div>
                 <span className="text-[10px] text-slate-400 font-mono">admin@kodewar.com</span>
               </button>
+
+              <button
+                type="button"
+                onClick={() => setPreset('vinay@kodewar.com', 'tutor123')}
+                className="w-full text-left p-2 rounded-lg bg-slate-50 dark:bg-slate-800/60 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex items-center justify-between text-xs"
+              >
+                <div className="flex items-center gap-2">
+                  <GraduationCap className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+                  <span className="font-medium text-slate-900 dark:text-white">Assigned Tutor</span>
+                </div>
+                <span className="text-[10px] text-slate-400 font-mono">vinay@kodewar.com</span>
+              </button>
             </div>
             <p className="text-[11px] text-slate-400 mt-3 leading-relaxed">
-              Enrolled candidates can sign in with their registered email or unique Candidate ID after accounts are created by the administrator.
+              Enrolled candidates and assigned tutors can sign in with their registered email or unique account ID.
             </p>
           </div>
         </div>

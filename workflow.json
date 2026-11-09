@@ -102,7 +102,7 @@
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={\n  \"success\": true,\n  \"message\": \"Candidate onboarding email delivered successfully via n8n\",\n  \"candidate_id\": \"{{ $json.candidate_id }}\",\n  \"user_email\": \"{{ $json.user_email }}\",\n  \"event_type\": \"{{ $json.event_type }}\",\n  \"subject\": \"{{ $json.subject }}\",\n  \"timestamp\": \"{{ $now.toISO() }}\"\n}",
+        "responseBody": "={\n  \"success\": true,\n  \"message\": \"Candidate onboarding email delivered successfully via n8n\",\n  \"candidate_id\": \"{{ $('Build Email Markdown & HTML').item.json.candidate_id || '' }}\",\n  \"user_email\": \"{{ $('Build Email Markdown & HTML').item.json.user_email || '' }}\",\n  \"event_type\": \"{{ $('Build Email Markdown & HTML').item.json.event_type || '' }}\",\n  \"subject\": \"{{ $('Build Email Markdown & HTML').item.json.subject || '' }}\",\n  \"timestamp\": \"{{ $now.toISO() }}\"\n}",
         "options": {}
       },
       "id": "77777777-7777-7777-7777-777777777777",

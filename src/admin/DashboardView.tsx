@@ -7,6 +7,7 @@ import {
   BookOpen,
   CheckCircle,
   Calendar,
+  CalendarClock,
   PlusCircle,
   Upload,
   ArrowRight,
@@ -98,6 +99,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           >
             <Calendar className="w-3.5 h-3.5" />
             <span>Schedule Meeting</span>
+          </button>
+          <button
+            onClick={() => onNavigate('leave-management')}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+          >
+            <CalendarClock className="w-3.5 h-3.5 text-blue-600" />
+            <span>Leave Management</span>
           </button>
           <button
             onClick={() => onNavigate('resources')}

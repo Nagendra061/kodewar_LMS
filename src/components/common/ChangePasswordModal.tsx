@@ -10,8 +10,8 @@ export const ChangePasswordModal: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // If candidate is not required to change password, do not render
-  if (!user || user.role !== 'candidate' || !(user as any).mustChangePassword) {
+  // If user is not required to change password, do not render
+  if (!user || !(user.role === 'candidate' || user.role === 'tutor') || !(user as any).mustChangePassword) {
     return null;
   }
 
@@ -50,7 +50,7 @@ export const ChangePasswordModal: React.FC = () => {
           Set Permanent Password
         </h3>
         <p className="text-xs text-slate-500 dark:text-slate-400 mb-5 leading-relaxed">
-          Welcome to Kodewar LMS! As a security requirement for newly enrolled candidates, you must replace your temporary credential with a permanent password before accessing your learning portal.
+          Welcome to Kodewar LMS! As a security requirement for newly activated accounts, you must replace your temporary credential with a permanent password before accessing your portal.
         </p>
 
         {error && (

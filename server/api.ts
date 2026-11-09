@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import type { Response } from 'express';
 import crypto from 'crypto';
-import { dbManager, hashPassword } from './db.ts';
+import { dbManager, hashPassword, getDefaultTutorPermissions } from './db.ts';
 import {
   getSupabaseConfig,
   isSupabaseConnected,
@@ -16,6 +16,8 @@ import {
   requireAuth,
   requireAdmin,
   requireCandidate,
+  requireTutor,
+  requireTutorOrAdmin,
 } from './auth.ts';
 import type {
   CandidateUser,
@@ -26,8 +28,20 @@ import type {
   AttendanceStatus,
   CandidateBatchAssignment,
   Tutor,
+  TutorUser,
+  TutorPermissions,
   EmailLog,
+  LeaveApplication,
+  LeaveType,
+  LeavePolicy,
+  LeaveStatus,
 } from '../src/types/index.ts';
+import {
+  calculateLeaveDays,
+  validateLeaveDates,
+  checkLeaveOverlap,
+  getTodayDateString,
+} from '../src/common/validation/leaveValidation.ts';
 import { triggerN8nCandidateOnboarding } from './n8n.ts';
 
 export const apiRouter = Router();
@@ -123,7 +137,66 @@ apiRouter.post('/auth/login', (req, res) => {
     }
   }
 
-  res.status(401).json({ error: 'Invalid email/Candidate ID or password.' });
+  // Check Tutors
+  const tut = db.tutors.find(
+    (t) =>
+      t.email.toLowerCase() === normalizedId ||
+      t.tutorId.toLowerCase() === normalizedId
+  );
+
+  if (tut) {
+    const computedHash = hashPassword(password, tut.salt || '');
+    if (computedHash === tut.passwordHash) {
+      if (tut.status === 'inactive') {
+        res.status(403).json({ error: 'Your tutor account has been deactivated. Please contact administrator.' });
+        return;
+      }
+
+      const token = generateToken(tut.id, 'tutor');
+      const assignedCourseNames = (tut.assignedCourseIds || [])
+        .map((cid) => db.courses.find((c) => c.id === cid)?.name)
+        .filter(Boolean) as string[];
+      const assignedBatchNames = (tut.assignedBatchIds || [])
+        .map((bid) => db.batches.find((b) => b.id === bid)?.name)
+        .filter(Boolean) as string[];
+
+      dbManager.logAudit(
+        tut.email,
+        'tutor',
+        'TUTOR_LOGIN',
+        'tutor',
+        tut.id,
+        `Tutor ${tut.name} (${tut.tutorId}) logged in.`
+      );
+
+      res.json({
+        token,
+        user: {
+          id: tut.id,
+          tutorId: tut.tutorId,
+          name: tut.name,
+          email: tut.email,
+          phone: tut.phone,
+          specialization: tut.specialization,
+          designation: tut.designation,
+          avatarUrl: tut.avatarUrl,
+          status: tut.status,
+          assignedCourseIds: tut.assignedCourseIds || [],
+          assignedCourseNames,
+          assignedBatchIds: tut.assignedBatchIds || [],
+          assignedBatchNames,
+          permissions: tut.permissions || getDefaultTutorPermissions(),
+          mustChangePassword: tut.mustChangePassword,
+          notes: tut.notes,
+          createdAt: tut.createdAt,
+          role: 'tutor',
+        },
+      });
+      return;
+    }
+  }
+
+  res.status(401).json({ error: 'Invalid email, Candidate/Tutor ID, or password.' });
 });
 
 apiRouter.post('/auth/register', (req, res) => {
@@ -254,6 +327,42 @@ apiRouter.post('/auth/change-password', requireAuth, (req: AuthenticatedRequest,
     return;
   }
 
+  if (req.user!.role === 'tutor') {
+    const tut = db.tutors.find((t) => t.id === req.user!.id);
+    if (!tut) {
+      res.status(404).json({ error: 'Tutor account not found.' });
+      return;
+    }
+
+    if (!tut.mustChangePassword && currentPassword) {
+      const checkHash = hashPassword(currentPassword, tut.salt || '');
+      if (checkHash !== tut.passwordHash) {
+        res.status(400).json({ error: 'Current password is incorrect.' });
+        return;
+      }
+    }
+
+    const newSalt = crypto.randomBytes(16).toString('hex');
+    tut.salt = newSalt;
+    tut.passwordHash = hashPassword(newPassword, newSalt);
+    tut.mustChangePassword = false;
+    delete tut.tempPassword;
+
+    dbManager.save();
+    dbManager.logAudit(tut.email, 'tutor', 'PASSWORD_CHANGED', 'tutor', tut.id, `Tutor ${tut.name} (${tut.tutorId}) updated password.`);
+    dbManager.queueEmail(tut.email, tut.name, 'Tutor Portal Password Updated', 'tutor_password_reset', 'sent');
+
+    res.json({
+      success: true,
+      message: 'Password updated successfully. Tutor account is fully active.',
+      user: {
+        ...req.user,
+        mustChangePassword: false,
+      },
+    });
+    return;
+  }
+
   const cand = db.candidates.find((c) => c.id === req.user!.id);
   if (!cand) {
     res.status(404).json({ error: 'Candidate record not found.' });
@@ -306,6 +415,50 @@ apiRouter.post('/auth/quick-switch', (req, res) => {
         email: db.admin.email,
         name: db.admin.name,
         role: 'admin',
+      },
+    });
+    return;
+  }
+
+  if (role === 'tutor') {
+    let tut = candidateId
+      ? db.tutors.find((t) => t.id === candidateId || t.tutorId === candidateId || t.email === candidateId)
+      : db.tutors.find((t) => t.status === 'active') || db.tutors[0];
+
+    if (!tut) {
+      res.status(404).json({ error: 'No tutors found.' });
+      return;
+    }
+
+    const token = generateToken(tut.id, 'tutor');
+    const assignedCourseNames = (tut.assignedCourseIds || [])
+      .map((cid) => db.courses.find((c) => c.id === cid)?.name)
+      .filter(Boolean) as string[];
+    const assignedBatchNames = (tut.assignedBatchIds || [])
+      .map((bid) => db.batches.find((b) => b.id === bid)?.name)
+      .filter(Boolean) as string[];
+
+    res.json({
+      token,
+      user: {
+        id: tut.id,
+        tutorId: tut.tutorId,
+        name: tut.name,
+        email: tut.email,
+        phone: tut.phone,
+        specialization: tut.specialization,
+        designation: tut.designation,
+        avatarUrl: tut.avatarUrl,
+        status: tut.status,
+        assignedCourseIds: tut.assignedCourseIds || [],
+        assignedCourseNames,
+        assignedBatchIds: tut.assignedBatchIds || [],
+        assignedBatchNames,
+        permissions: tut.permissions || getDefaultTutorPermissions(),
+        mustChangePassword: tut.mustChangePassword,
+        notes: tut.notes,
+        createdAt: tut.createdAt,
+        role: 'tutor',
       },
     });
     return;
@@ -1425,37 +1578,95 @@ apiRouter.get('/tutors', requireAuth, (req, res) => {
 });
 
 apiRouter.post('/tutors', requireAdmin, (req: AuthenticatedRequest, res) => {
-  const { tutorId, name, email, phone, specialization, assignedCourseIds, notes } = req.body;
+  const {
+    tutorId,
+    name,
+    email,
+    phone,
+    specialization,
+    designation,
+    avatarUrl,
+    assignedCourseIds,
+    assignedBatchIds,
+    permissions,
+    notes,
+    customPassword,
+  } = req.body;
+
   if (!name || !email) {
     res.status(400).json({ error: 'Tutor name and email are required.' });
     return;
   }
 
   const db = dbManager.get();
+  const normalizedEmail = email.trim().toLowerCase();
+  if (db.tutors.some((t) => t.email.toLowerCase() === normalizedEmail)) {
+    res.status(400).json({ error: 'A tutor with this email address already exists.' });
+    return;
+  }
+
   const customId = tutorId?.trim() || `TUT-${100 + db.tutors.length + 1}`;
   const assignedCourses = Array.isArray(assignedCourseIds) ? assignedCourseIds : [];
   const assignedCourseNames = db.courses
     .filter((c) => assignedCourses.includes(c.id))
     .map((c) => c.name);
 
-  const tutor: Tutor = {
+  const assignedBatches = Array.isArray(assignedBatchIds) ? assignedBatchIds : [];
+  const assignedBatchNames = db.batches
+    .filter((b) => assignedBatches.includes(b.id))
+    .map((b) => b.name);
+
+  // Generate initial temporary password
+  const tempPass = customPassword?.trim() || `Pass@${Math.floor(1000 + Math.random() * 9000)}`;
+  const salt = crypto.randomBytes(16).toString('hex');
+  const passwordHash = hashPassword(tempPass, salt);
+
+  const tutor: Tutor & { passwordHash: string; salt: string; tempPassword?: string } = {
     id: `tut-${Date.now()}`,
     tutorId: customId,
     name: name.trim(),
-    email: email.trim().toLowerCase(),
+    email: normalizedEmail,
     phone: phone?.trim() || '',
     specialization: specialization?.trim() || 'Software Engineering',
+    designation: designation?.trim() || 'Instructor / Tutor',
+    avatarUrl: avatarUrl?.trim() || '',
     status: 'active',
     assignedCourseIds: assignedCourses,
     assignedCourseNames,
+    assignedBatchIds: assignedBatches,
+    assignedBatchNames,
+    permissions: permissions ? { ...getDefaultTutorPermissions(), ...permissions } : getDefaultTutorPermissions(),
+    mustChangePassword: true,
+    tempPassword: tempPass,
     notes: notes?.trim() || '',
     createdAt: new Date().toISOString(),
+    role: 'tutor',
+    passwordHash,
+    salt,
   };
 
   db.tutors.push(tutor);
+
+  // Queue Welcome Email
+  dbManager.queueEmail(
+    tutor.email,
+    tutor.name,
+    'Welcome to Kodewar LMS - Tutor Portal Activation Credentials',
+    'tutor_welcome',
+    'delivered'
+  );
+
+  dbManager.logAudit(
+    req.user!.email,
+    'admin',
+    'TUTOR_CREATED',
+    'tutor',
+    tutor.id,
+    `Tutor ${tutor.name} (${tutor.tutorId}) created with initial credentials.`
+  );
+
   dbManager.save();
-  dbManager.logAudit(req.user!.email, 'admin', 'TUTOR_CREATED', 'tutor', tutor.id, `Tutor ${tutor.name} (${tutor.tutorId}) created.`);
-  res.status(201).json({ tutor });
+  res.status(201).json({ tutor, tempPassword: tempPass });
 });
 
 apiRouter.get('/tutors/:id', requireAuth, (req, res) => {
@@ -1476,23 +1687,141 @@ apiRouter.put('/tutors/:id', requireAdmin, (req: AuthenticatedRequest, res) => {
     return;
   }
 
-  const { name, email, phone, specialization, status, assignedCourseIds, notes } = req.body;
+  const {
+    name,
+    email,
+    phone,
+    specialization,
+    designation,
+    avatarUrl,
+    status,
+    assignedCourseIds,
+    assignedBatchIds,
+    permissions,
+    notes,
+  } = req.body;
+
   if (name) tutor.name = name.trim();
   if (email) tutor.email = email.trim().toLowerCase();
   if (phone !== undefined) tutor.phone = phone.trim();
   if (specialization) tutor.specialization = specialization.trim();
+  if (designation !== undefined) tutor.designation = designation.trim();
+  if (avatarUrl !== undefined) tutor.avatarUrl = avatarUrl;
   if (status) tutor.status = status;
+
   if (Array.isArray(assignedCourseIds)) {
     tutor.assignedCourseIds = assignedCourseIds;
     tutor.assignedCourseNames = db.courses
       .filter((c) => assignedCourseIds.includes(c.id))
       .map((c) => c.name);
   }
+
+  if (Array.isArray(assignedBatchIds)) {
+    tutor.assignedBatchIds = assignedBatchIds;
+    tutor.assignedBatchNames = db.batches
+      .filter((b) => assignedBatchIds.includes(b.id))
+      .map((b) => b.name);
+  }
+
+  if (permissions && typeof permissions === 'object') {
+    tutor.permissions = {
+      ...(tutor.permissions || getDefaultTutorPermissions()),
+      ...permissions,
+    };
+  }
+
   if (notes !== undefined) tutor.notes = notes.trim();
 
+  dbManager.logAudit(
+    req.user!.email,
+    'admin',
+    'TUTOR_UPDATED',
+    'tutor',
+    tutor.id,
+    `Tutor ${tutor.name} (${tutor.tutorId}) profile & permissions updated.`
+  );
+
   dbManager.save();
-  dbManager.logAudit(req.user!.email, 'admin', 'TUTOR_UPDATED', 'tutor', tutor.id, `Tutor ${tutor.name} updated.`);
   res.json({ tutor });
+});
+
+// Reset Tutor Password (Admin only)
+apiRouter.post('/tutors/:id/reset-password', requireAdmin, (req: AuthenticatedRequest, res) => {
+  const db = dbManager.get();
+  const tutor = db.tutors.find((t) => t.id === req.params.id);
+  if (!tutor) {
+    res.status(404).json({ error: 'Tutor not found.' });
+    return;
+  }
+
+  const tempPass = `Pass@${Math.floor(1000 + Math.random() * 9000)}`;
+  const salt = crypto.randomBytes(16).toString('hex');
+  tutor.salt = salt;
+  tutor.passwordHash = hashPassword(tempPass, salt);
+  tutor.tempPassword = tempPass;
+  tutor.mustChangePassword = true;
+
+  dbManager.queueEmail(
+    tutor.email,
+    tutor.name,
+    'Your Temporary Password Reset - Kodewar LMS Tutor Portal',
+    'tutor_password_reset',
+    'delivered'
+  );
+
+  dbManager.logAudit(
+    req.user!.email,
+    'admin',
+    'TUTOR_PASSWORD_RESET',
+    'tutor',
+    tutor.id,
+    `Password reset initiated for Tutor ${tutor.name} (${tutor.tutorId}).`
+  );
+
+  dbManager.save();
+  res.json({ success: true, tempPassword: tempPass, message: `Password reset. Temporary password is: ${tempPass}` });
+});
+
+// Get Tutor Activity History (Admin & Tutor)
+apiRouter.get('/tutors/:id/activity', requireAuth, (req: AuthenticatedRequest, res) => {
+  const db = dbManager.get();
+  const tutor = db.tutors.find((t) => t.id === req.params.id);
+  if (!tutor) {
+    res.status(404).json({ error: 'Tutor not found.' });
+    return;
+  }
+
+  // Security check: Tutor can only access their own activity unless user is admin
+  if (req.user!.role === 'tutor' && req.user!.id !== tutor.id) {
+    res.status(403).json({ error: 'Access denied.' });
+    return;
+  }
+
+  const assignedBatchIds = new Set(tutor.assignedBatchIds || []);
+  const assignedBatches = db.batches.filter((b) => b.tutorId === tutor.id || assignedBatchIds.has(b.id));
+  const meetings = db.meetingSessions.filter((m) => m.tutorId === tutor.id || assignedBatchIds.has(m.batchId));
+  const markedAttendanceCount = db.attendance.filter((a) => a.markedBy === tutor.name).length;
+  const resourcesCount = db.resources.filter((r) => r.uploadedBy === tutor.name || r.uploadedBy === tutor.id).length;
+
+  const totalCandidates = db.candidates.filter(
+    (c) => assignedBatchIds.has(c.currentBatchId) && c.status !== 'archived'
+  ).length;
+
+  res.json({
+    activity: {
+      assignedBatchesCount: assignedBatches.length,
+      assignedBatches,
+      batches: assignedBatches,
+      totalCandidates,
+      totalMeetings: meetings.length,
+      upcomingMeetings: meetings.filter((m) => m.status === 'scheduled'),
+      completedMeetings: meetings.filter((m) => m.status === 'completed'),
+      completedMeetingsCount: meetings.filter((m) => m.status === 'completed').length,
+      markedAttendanceCount,
+      attendanceSessionsMarked: markedAttendanceCount,
+      resourcesCount,
+    },
+  });
 });
 
 apiRouter.delete('/tutors/:id', requireAdmin, (req: AuthenticatedRequest, res) => {
@@ -2969,3 +3298,1871 @@ apiRouter.post('/supabase/sync', requireAdmin, async (req: AuthenticatedRequest,
     res.status(500).json({ error: err.message || 'Sync failed.' });
   }
 });
+
+// ==========================================
+// 14. LEAVE MANAGEMENT API MODULE
+// ==========================================
+
+// --- Helper: Generate unique application number ---
+function generateApplicationNumber(existingApplications: LeaveApplication[]): string {
+  const currentYear = new Date().getFullYear();
+  const yearPrefix = `LV-${currentYear}-`;
+  const thisYearApps = existingApplications.filter((a) =>
+    a.applicationNumber && a.applicationNumber.startsWith(yearPrefix)
+  );
+  let maxSeq = 0;
+  for (const app of thisYearApps) {
+    const seqPart = parseInt(app.applicationNumber.replace(yearPrefix, ''), 10);
+    if (!isNaN(seqPart) && seqPart > maxSeq) {
+      maxSeq = seqPart;
+    }
+  }
+  const nextSeq = maxSeq + 1;
+  return `${yearPrefix}${String(nextSeq).padStart(4, '0')}`;
+}
+
+// 1. Get Leave Types (Auth required - both Admin and Candidates)
+apiRouter.get('/leave/types', requireAuth, (req, res) => {
+  const db = dbManager.get();
+  res.json({ leaveTypes: db.leaveTypes || [] });
+});
+
+// 2. Create Leave Type (Admin only)
+apiRouter.post('/leave/types', requireAdmin, (req: AuthenticatedRequest, res) => {
+  const { name, code, description, isActive, requiresDocument, maxDaysPerYear, color } = req.body;
+  if (!name || !name.trim()) {
+    res.status(400).json({ error: 'Leave type name is required.' });
+    return;
+  }
+  if (!code || !code.trim()) {
+    res.status(400).json({ error: 'Leave type code is required (e.g. SICK, PERSONAL).' });
+    return;
+  }
+
+  const db = dbManager.get();
+  const normalizedCode = code.trim().toUpperCase();
+  const exists = db.leaveTypes.some((t) => t.code.toUpperCase() === normalizedCode);
+  if (exists) {
+    res.status(400).json({ error: `A leave type with code "${normalizedCode}" already exists.` });
+    return;
+  }
+
+  const newType: LeaveType = {
+    id: `lt-${Date.now()}`,
+    name: name.trim(),
+    code: normalizedCode,
+    description: description ? description.trim() : '',
+    isActive: isActive !== false,
+    requiresDocument: !!requiresDocument,
+    maxDaysPerYear: typeof maxDaysPerYear === 'number' ? maxDaysPerYear : 12,
+    color: color || 'blue',
+    createdAt: new Date().toISOString(),
+  };
+
+  db.leaveTypes.push(newType);
+  dbManager.logAudit(
+    req.user!.email,
+    'admin',
+    'LEAVE_TYPE_CREATED',
+    'leave_type',
+    newType.id,
+    `Created leave type "${newType.name}" (${newType.code}).`
+  );
+  dbManager.save();
+  res.status(201).json({ leaveType: newType });
+});
+
+// 3. Update Leave Type (Admin only)
+apiRouter.put('/leave/types/:id', requireAdmin, (req: AuthenticatedRequest, res) => {
+  const db = dbManager.get();
+  const index = db.leaveTypes.findIndex((t) => t.id === req.params.id);
+  if (index === -1) {
+    res.status(404).json({ error: 'Leave type not found.' });
+    return;
+  }
+
+  const target = db.leaveTypes[index];
+  const { name, code, description, isActive, requiresDocument, maxDaysPerYear, color } = req.body;
+
+  if (name !== undefined) target.name = name.trim();
+  if (code !== undefined) target.code = code.trim().toUpperCase();
+  if (description !== undefined) target.description = description.trim();
+  if (isActive !== undefined) target.isActive = !!isActive;
+  if (requiresDocument !== undefined) target.requiresDocument = !!requiresDocument;
+  if (maxDaysPerYear !== undefined) target.maxDaysPerYear = Number(maxDaysPerYear);
+  if (color !== undefined) target.color = color;
+
+  dbManager.logAudit(
+    req.user!.email,
+    'admin',
+    'LEAVE_TYPE_UPDATED',
+    'leave_type',
+    target.id,
+    `Updated leave type "${target.name}".`
+  );
+  dbManager.save();
+  res.json({ leaveType: target });
+});
+
+// 4. Delete / Deactivate Leave Type (Admin only)
+apiRouter.delete('/leave/types/:id', requireAdmin, (req: AuthenticatedRequest, res) => {
+  const db = dbManager.get();
+  const index = db.leaveTypes.findIndex((t) => t.id === req.params.id);
+  if (index === -1) {
+    res.status(404).json({ error: 'Leave type not found.' });
+    return;
+  }
+
+  const target = db.leaveTypes[index];
+  // Check if any leave applications use this leave type
+  const inUse = db.leaveApplications.some((a) => a.leaveTypeId === target.id);
+  if (inUse) {
+    // If in use, soft-deactivate instead of breaking historical references
+    target.isActive = false;
+    dbManager.logAudit(
+      req.user!.email,
+      'admin',
+      'LEAVE_TYPE_DEACTIVATED',
+      'leave_type',
+      target.id,
+      `Deactivated leave type "${target.name}" because historical applications reference it.`
+    );
+    dbManager.save();
+    res.json({
+      success: true,
+      message: `Leave type "${target.name}" has existing applications and was deactivated instead of deleted.`,
+    });
+    return;
+  }
+
+  db.leaveTypes.splice(index, 1);
+  dbManager.logAudit(
+    req.user!.email,
+    'admin',
+    'LEAVE_TYPE_DELETED',
+    'leave_type',
+    target.id,
+    `Deleted leave type "${target.name}".`
+  );
+  dbManager.save();
+  res.json({ success: true, message: `Leave type "${target.name}" deleted successfully.` });
+});
+
+// 5. Get Leave Policy (Auth required)
+apiRouter.get('/leave/policy', requireAuth, (req, res) => {
+  const db = dbManager.get();
+  res.json({ policy: db.leavePolicy });
+});
+
+// 6. Update Leave Policy (Admin only)
+apiRouter.put('/leave/policy', requireAdmin, (req: AuthenticatedRequest, res) => {
+  const db = dbManager.get();
+  const { calculationMode, allowRetrospective, maxConsecutiveDays, requireAttachmentAboveDays } = req.body;
+
+  if (calculationMode && !['calendar_days', 'working_days'].includes(calculationMode)) {
+    res.status(400).json({ error: 'Invalid calculation mode. Must be "calendar_days" or "working_days".' });
+    return;
+  }
+
+  db.leavePolicy = {
+    calculationMode: calculationMode || db.leavePolicy.calculationMode || 'working_days',
+    allowRetrospective: allowRetrospective !== undefined ? !!allowRetrospective : db.leavePolicy.allowRetrospective,
+    maxConsecutiveDays: typeof maxConsecutiveDays === 'number' ? maxConsecutiveDays : (db.leavePolicy.maxConsecutiveDays || 30),
+    requireAttachmentAboveDays: typeof requireAttachmentAboveDays === 'number' ? requireAttachmentAboveDays : (db.leavePolicy.requireAttachmentAboveDays || 2),
+  };
+
+  dbManager.logAudit(
+    req.user!.email,
+    'admin',
+    'LEAVE_POLICY_UPDATED',
+    'policy',
+    'leave-policy',
+    `Updated leave calculation policy (mode: ${db.leavePolicy.calculationMode}, allowRetro: ${db.leavePolicy.allowRetrospective}).`
+  );
+  dbManager.save();
+  res.json({ policy: db.leavePolicy });
+});
+
+// 7. Get All Leave Applications (Admin only with full filtering)
+apiRouter.get('/leave/applications', requireAdmin, (req: AuthenticatedRequest, res) => {
+  const db = dbManager.get();
+  const { candidateId, courseId, batchId, leaveTypeId, status, startDate, endDate, search, applicantRole } = req.query;
+
+  let apps = [...db.leaveApplications];
+
+  // Helper filter checker
+  const isValid = (v: any) => v && v !== 'all' && v !== 'undefined' && v !== 'null' && String(v).trim().length > 0;
+
+  if (isValid(applicantRole)) {
+    apps = apps.filter((a) => (a.applicantRole || 'candidate') === applicantRole);
+  }
+  if (isValid(candidateId)) {
+    apps = apps.filter(
+      (a) =>
+        a.candidateId === candidateId ||
+        a.candidateCustomId === candidateId ||
+        a.tutorId === candidateId ||
+        a.tutorCustomId === candidateId
+    );
+  }
+  if (isValid(courseId)) {
+    apps = apps.filter((a) => a.courseId === courseId);
+  }
+  if (isValid(batchId)) {
+    apps = apps.filter((a) => a.batchId === batchId);
+  }
+  if (isValid(leaveTypeId)) {
+    apps = apps.filter((a) => a.leaveTypeId === leaveTypeId);
+  }
+  if (isValid(status)) {
+    apps = apps.filter((a) => a.status === status);
+  }
+  if (isValid(startDate)) {
+    apps = apps.filter((a) => a.startDate >= String(startDate));
+  }
+  if (isValid(endDate)) {
+    apps = apps.filter((a) => a.endDate <= String(endDate));
+  }
+  if (isValid(search)) {
+    const q = String(search).toLowerCase().trim();
+    apps = apps.filter(
+      (a) =>
+        a.applicationNumber.toLowerCase().includes(q) ||
+        a.candidateName.toLowerCase().includes(q) ||
+        a.candidateCustomId.toLowerCase().includes(q) ||
+        (a.tutorCustomId && a.tutorCustomId.toLowerCase().includes(q)) ||
+        a.candidateEmail.toLowerCase().includes(q) ||
+        a.leaveTypeName.toLowerCase().includes(q) ||
+        a.reason.toLowerCase().includes(q) ||
+        (a.adminRemarks && a.adminRemarks.toLowerCase().includes(q))
+    );
+  }
+
+  // Sort descending by appliedAt (most recent first)
+  apps.sort((a, b) => new Date(b.appliedAt).getTime() - new Date(a.appliedAt).getTime());
+
+  // Aggregate stats across all leave applications in DB
+  const allApps = db.leaveApplications;
+  const summary = {
+    total: allApps.length,
+    pending: allApps.filter((a) => a.status === 'pending').length,
+    approved: allApps.filter((a) => a.status === 'approved').length,
+    rejected: allApps.filter((a) => a.status === 'rejected').length,
+    cancelled: allApps.filter((a) => a.status === 'cancelled').length,
+    totalApprovedDays: allApps
+      .filter((a) => a.status === 'approved')
+      .reduce((sum, a) => sum + (a.totalDays || 0), 0),
+  };
+
+  res.json({ applications: apps, summary });
+});
+
+// 8. Get Single Leave Application Details
+apiRouter.get('/leave/applications/:id', requireAuth, (req: AuthenticatedRequest, res) => {
+  const db = dbManager.get();
+  const app = db.leaveApplications.find((a) => a.id === req.params.id);
+  if (!app) {
+    res.status(404).json({ error: 'Leave application not found.' });
+    return;
+  }
+
+  // Security check: Candidate can ONLY access their own application
+  if (req.user!.role === 'candidate' && app.candidateId !== req.user!.id) {
+    res.status(403).json({ error: 'You are not authorized to view another candidate’s leave application.' });
+    return;
+  }
+
+  // Security check: Tutor can ONLY access their own application
+  if (
+    req.user!.role === 'tutor' &&
+    app.candidateId !== req.user!.id &&
+    app.tutorId !== req.user!.id &&
+    app.candidateEmail !== req.user!.email
+  ) {
+    res.status(403).json({ error: 'You are not authorized to view another user’s leave application.' });
+    return;
+  }
+
+  res.json({ application: app });
+});
+
+// 9. Approve Leave Application (Admin only)
+apiRouter.put('/leave/applications/:id/approve', requireAdmin, (req: AuthenticatedRequest, res) => {
+  const db = dbManager.get();
+  const app = db.leaveApplications.find((a) => a.id === req.params.id);
+  if (!app) {
+    res.status(404).json({ error: 'Leave application not found.' });
+    return;
+  }
+
+  if (app.status === 'approved') {
+    res.status(400).json({ error: 'This leave application is already approved.' });
+    return;
+  }
+
+  const { remarks } = req.body;
+  const now = new Date().toISOString();
+
+  app.status = 'approved';
+  if (remarks && remarks.trim()) {
+    app.adminRemarks = remarks.trim();
+  }
+  app.updatedAt = now;
+
+  // Append to status history
+  app.history.unshift({
+    id: `hist-${Date.now()}`,
+    status: 'approved',
+    changedBy: req.user!.email,
+    changedByRole: 'admin',
+    remarks: remarks?.trim() || undefined,
+    timestamp: now,
+  });
+
+  // Candidate or Tutor In-App Notification
+  const isTutorApp = app.applicantRole === 'tutor';
+  db.notifications.unshift({
+    id: `notif-${Date.now()}-${app.tutorId || app.candidateId}`,
+    title: `Leave Application Approved (${app.applicationNumber})`,
+    message: `Your ${app.leaveTypeName} request from ${app.startDate} to ${app.endDate} (${app.totalDays} day(s)) has been APPROVED by Super Admin.${remarks ? ` Remarks: ${remarks.trim()}` : ''}`,
+    type: 'leave',
+    targetAudience: isTutorApp ? 'tutor' : 'candidate',
+    ...(isTutorApp ? { tutorId: app.tutorId || app.candidateId } : { candidateId: app.candidateId }),
+    relatedEntity: { type: 'leave', id: app.id },
+    createdAt: now,
+    read: false,
+  });
+
+  // Email Notification
+  dbManager.queueEmail(
+    app.candidateEmail,
+    app.candidateName,
+    `Leave Application Approved - ${app.applicationNumber}`,
+    'leave_approved',
+    'delivered'
+  );
+
+  // Super Admin Audit Log
+  dbManager.logAudit(
+    req.user!.email,
+    'admin',
+    'LEAVE_APPROVED',
+    'leave',
+    app.id,
+    `Approved leave application ${app.applicationNumber} for ${isTutorApp ? 'instructor' : 'candidate'} ${app.candidateName} (${app.tutorCustomId || app.candidateCustomId}, ${app.totalDays} day(s)).`
+  );
+
+  dbManager.save();
+  res.json({ application: app });
+});
+
+// 10. Reject Leave Application (Admin only - Mandatory Reason!)
+apiRouter.put('/leave/applications/:id/reject', requireAdmin, (req: AuthenticatedRequest, res) => {
+  const { rejectionReason, remarks } = req.body;
+  if (!rejectionReason || !rejectionReason.trim()) {
+    res.status(400).json({ error: 'A mandatory rejection reason is required to reject a leave application.' });
+    return;
+  }
+
+  const db = dbManager.get();
+  const app = db.leaveApplications.find((a) => a.id === req.params.id);
+  if (!app) {
+    res.status(404).json({ error: 'Leave application not found.' });
+    return;
+  }
+
+  if (app.status === 'rejected') {
+    res.status(400).json({ error: 'This leave application is already rejected.' });
+    return;
+  }
+
+  const now = new Date().toISOString();
+  app.status = 'rejected';
+  app.rejectionReason = rejectionReason.trim();
+  if (remarks && remarks.trim()) {
+    app.adminRemarks = remarks.trim();
+  }
+  app.updatedAt = now;
+
+  // Append to status history
+  app.history.unshift({
+    id: `hist-${Date.now()}`,
+    status: 'rejected',
+    changedBy: req.user!.email,
+    changedByRole: 'admin',
+    reason: rejectionReason.trim(),
+    remarks: remarks?.trim() || undefined,
+    timestamp: now,
+  });
+
+  // Candidate or Tutor In-App Notification
+  const isTutorReject = app.applicantRole === 'tutor';
+  db.notifications.unshift({
+    id: `notif-${Date.now()}-${app.tutorId || app.candidateId}`,
+    title: `Leave Application Rejected (${app.applicationNumber})`,
+    message: `Your ${app.leaveTypeName} application (${app.startDate} to ${app.endDate}) was REJECTED. Reason: ${rejectionReason.trim()}`,
+    type: 'leave',
+    targetAudience: isTutorReject ? 'tutor' : 'candidate',
+    ...(isTutorReject ? { tutorId: app.tutorId || app.candidateId } : { candidateId: app.candidateId }),
+    relatedEntity: { type: 'leave', id: app.id },
+    createdAt: now,
+    read: false,
+  });
+
+  // Email Notification
+  dbManager.queueEmail(
+    app.candidateEmail,
+    app.candidateName,
+    `Leave Application Rejected - ${app.applicationNumber}`,
+    'leave_rejected',
+    'delivered'
+  );
+
+  // Super Admin Audit Log
+  dbManager.logAudit(
+    req.user!.email,
+    'admin',
+    'LEAVE_REJECTED',
+    'leave',
+    app.id,
+    `Rejected leave application ${app.applicationNumber} for ${isTutorReject ? 'instructor' : 'candidate'} ${app.candidateName}. Reason: ${rejectionReason.trim()}`
+  );
+
+  dbManager.save();
+  res.json({ application: app });
+});
+
+// 11. Revoke / Cancel Approved Leave Application (Admin only)
+apiRouter.put('/leave/applications/:id/revoke', requireAdmin, (req: AuthenticatedRequest, res) => {
+  const { revokeReason, remarks } = req.body;
+  if (!revokeReason || !revokeReason.trim()) {
+    res.status(400).json({ error: 'A mandatory explanation is required to revoke an approved leave application.' });
+    return;
+  }
+
+  const db = dbManager.get();
+  const app = db.leaveApplications.find((a) => a.id === req.params.id);
+  if (!app) {
+    res.status(404).json({ error: 'Leave application not found.' });
+    return;
+  }
+
+  if (app.status !== 'approved') {
+    res.status(400).json({ error: 'Only previously approved leave applications can be revoked.' });
+    return;
+  }
+
+  const now = new Date().toISOString();
+  app.status = 'cancelled';
+  app.adminRemarks = (app.adminRemarks ? `${app.adminRemarks} | ` : '') + `Revocation Note: ${revokeReason.trim()}`;
+  app.updatedAt = now;
+
+  // Append to status history
+  app.history.unshift({
+    id: `hist-${Date.now()}`,
+    status: 'cancelled',
+    changedBy: req.user!.email,
+    changedByRole: 'admin',
+    reason: revokeReason.trim(),
+    remarks: remarks?.trim() || undefined,
+    timestamp: now,
+  });
+
+  // Candidate or Tutor In-App Notification
+  const isTutorRevoke = app.applicantRole === 'tutor';
+  db.notifications.unshift({
+    id: `notif-${Date.now()}-${app.tutorId || app.candidateId}`,
+    title: `Approved Leave Revoked (${app.applicationNumber})`,
+    message: `Your approved leave for ${app.startDate} to ${app.endDate} has been revoked by Administration. Reason: ${revokeReason.trim()}`,
+    type: 'leave',
+    targetAudience: isTutorRevoke ? 'tutor' : 'candidate',
+    ...(isTutorRevoke ? { tutorId: app.tutorId || app.candidateId } : { candidateId: app.candidateId }),
+    relatedEntity: { type: 'leave', id: app.id },
+    createdAt: now,
+    read: false,
+  });
+
+  // Email Notification
+  dbManager.queueEmail(
+    app.candidateEmail,
+    app.candidateName,
+    `Notice: Approved Leave Revoked - ${app.applicationNumber}`,
+    'leave_revoked',
+    'delivered'
+  );
+
+  // Super Admin Audit Log
+  dbManager.logAudit(
+    req.user!.email,
+    'admin',
+    'LEAVE_REVOKED',
+    'leave',
+    app.id,
+    `Revoked approved leave application ${app.applicationNumber} for ${isTutorRevoke ? 'instructor' : 'candidate'} ${app.candidateName}. Reason: ${revokeReason.trim()}`
+  );
+
+  dbManager.save();
+  res.json({ application: app });
+});
+
+// 12. Update Admin Remarks (Admin only)
+apiRouter.put('/leave/applications/:id/remarks', requireAdmin, (req: AuthenticatedRequest, res) => {
+  const { remarks } = req.body;
+  const db = dbManager.get();
+  const app = db.leaveApplications.find((a) => a.id === req.params.id);
+  if (!app) {
+    res.status(404).json({ error: 'Leave application not found.' });
+    return;
+  }
+
+  app.adminRemarks = remarks ? remarks.trim() : '';
+  app.updatedAt = new Date().toISOString();
+
+  dbManager.logAudit(
+    req.user!.email,
+    'admin',
+    'LEAVE_REMARKS_UPDATED',
+    'leave',
+    app.id,
+    `Updated remarks for leave application ${app.applicationNumber}.`
+  );
+
+  dbManager.save();
+  res.json({ application: app });
+});
+
+// 13. Candidate: Get Own Leave Applications
+apiRouter.get('/candidate/leave', requireCandidate, (req: AuthenticatedRequest, res) => {
+  const db = dbManager.get();
+  const cand = req.user as CandidateUser;
+
+  // Strict ownership isolation: ONLY return current candidate's applications
+  const myApps = db.leaveApplications.filter((a) => a.candidateId === cand.id);
+
+  // Sort descending by appliedAt
+  myApps.sort((a, b) => new Date(b.appliedAt).getTime() - new Date(a.appliedAt).getTime());
+
+  const summary = {
+    total: myApps.length,
+    pending: myApps.filter((a) => a.status === 'pending').length,
+    approved: myApps.filter((a) => a.status === 'approved').length,
+    rejected: myApps.filter((a) => a.status === 'rejected').length,
+    cancelled: myApps.filter((a) => a.status === 'cancelled').length,
+    totalApprovedDays: myApps
+      .filter((a) => a.status === 'approved')
+      .reduce((sum, a) => sum + (a.totalDays || 0), 0),
+  };
+
+  res.json({ applications: myApps, summary });
+});
+
+// 14. Candidate: Apply for Leave
+apiRouter.post('/candidate/leave', requireCandidate, (req: AuthenticatedRequest, res) => {
+  const db = dbManager.get();
+  const cand = req.user as CandidateUser;
+
+  // Verify candidate account is active
+  if (cand.status === 'archived' || cand.status === 'inactive') {
+    res.status(403).json({ error: 'Your account is inactive. Please contact administration to apply for leave.' });
+    return;
+  }
+
+  const { leaveTypeId, startDate, endDate, reason, attachments } = req.body;
+
+  // Validation 1: Required fields
+  if (!leaveTypeId) {
+    res.status(400).json({ error: 'Please select a leave type.' });
+    return;
+  }
+  if (!reason || !reason.trim()) {
+    res.status(400).json({ error: 'Please enter the reason for your leave application.' });
+    return;
+  }
+
+  // Validation 2: Leave type exists and active
+  const leaveType = db.leaveTypes.find((t) => t.id === leaveTypeId);
+  if (!leaveType) {
+    res.status(400).json({ error: 'Selected leave type was not found.' });
+    return;
+  }
+  if (!leaveType.isActive) {
+    res.status(400).json({ error: `The leave type "${leaveType.name}" is currently inactive.` });
+    return;
+  }
+
+  // Validation 3: Date validity and retrospective check
+  const dateValidation = validateLeaveDates(
+    startDate,
+    endDate,
+    db.leavePolicy,
+    db.settings.companyTimezone || 'Asia/Kolkata'
+  );
+  if (!dateValidation.isValid) {
+    res.status(400).json({ error: dateValidation.error });
+    return;
+  }
+
+  // Validation 4: Calculate total leave days
+  const totalDays = calculateLeaveDays(startDate, endDate, db.leavePolicy.calculationMode || 'working_days');
+  if (totalDays <= 0) {
+    res.status(400).json({
+      error: `The selected date range (${startDate} to ${endDate}) yields 0 days under the current company policy (${db.leavePolicy.calculationMode === 'working_days' ? 'working days excluding weekends' : 'calendar days'}).`,
+    });
+    return;
+  }
+
+  // Validation 5: Overlap check with candidate's existing pending or approved applications
+  const candExistingApps = db.leaveApplications.filter((a) => a.candidateId === cand.id);
+  const overlapCheck = checkLeaveOverlap(startDate, endDate, candExistingApps);
+  if (overlapCheck.hasOverlap && overlapCheck.overlappingApp) {
+    const opp = overlapCheck.overlappingApp;
+    res.status(400).json({
+      error: `Overlapping leave request detected: You already have a ${opp.status.toUpperCase()} leave application (${opp.applicationNumber} from ${opp.startDate} to ${opp.endDate}) during this period.`,
+    });
+    return;
+  }
+
+  // Validation 6: Supporting document requirement
+  const sanitizedAttachments: any[] = Array.isArray(attachments) ? attachments : [];
+  if (leaveType.requiresDocument && sanitizedAttachments.length === 0) {
+    res.status(400).json({
+      error: `Supporting documentation is mandatory for "${leaveType.name}". Please attach supporting documents.`,
+    });
+    return;
+  }
+  if (
+    db.leavePolicy.requireAttachmentAboveDays > 0 &&
+    totalDays > db.leavePolicy.requireAttachmentAboveDays &&
+    sanitizedAttachments.length === 0
+  ) {
+    res.status(400).json({
+      error: `Company policy requires a supporting document for leave requests exceeding ${db.leavePolicy.requireAttachmentAboveDays} days.`,
+    });
+    return;
+  }
+
+  // Fetch course and batch details
+  const course = db.courses.find((c) => c.id === cand.courseId);
+  const batch = db.batches.find((b) => b.id === cand.currentBatchId);
+
+  const applicationNumber = generateApplicationNumber(db.leaveApplications);
+  const now = new Date().toISOString();
+
+  const newApp: LeaveApplication = {
+    id: `leave-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+    applicationNumber,
+    candidateId: cand.id,
+    candidateCustomId: cand.candidateId,
+    candidateName: cand.name,
+    candidateEmail: cand.email,
+    courseId: cand.courseId,
+    courseName: course?.name || 'General Course',
+    batchId: cand.currentBatchId,
+    batchName: batch?.name || 'General Batch',
+    leaveTypeId: leaveType.id,
+    leaveTypeName: leaveType.name,
+    startDate,
+    endDate,
+    totalDays,
+    reason: reason.trim(),
+    status: 'pending',
+    attachments: sanitizedAttachments.map((att: any) => ({
+      id: att.id || `att-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      fileName: att.fileName || 'document',
+      fileSize: Number(att.fileSize) || 0,
+      mimeType: att.mimeType || 'application/octet-stream',
+      dataUrl: att.dataUrl || '',
+      uploadedAt: now,
+    })),
+    history: [
+      {
+        id: `hist-${Date.now()}`,
+        status: 'pending',
+        changedBy: cand.email,
+        changedByRole: 'candidate',
+        reason: 'Application submitted by candidate',
+        timestamp: now,
+      },
+    ],
+    appliedAt: now,
+    updatedAt: now,
+  };
+
+  db.leaveApplications.unshift(newApp);
+
+  // In-app Notification for Super Admin
+  db.notifications.unshift({
+    id: `notif-${Date.now()}-admin-leave`,
+    title: `New Leave Application: ${cand.name}`,
+    message: `${cand.name} (${cand.candidateId}) submitted a ${leaveType.name} application for ${startDate} to ${endDate} (${totalDays} day(s)).`,
+    type: 'leave',
+    targetAudience: 'all',
+    relatedEntity: { type: 'leave', id: newApp.id },
+    createdAt: now,
+    read: false,
+  });
+
+  // Email Notification to Super Admin
+  dbManager.queueEmail(
+    db.admin.email,
+    db.admin.name,
+    `New Leave Application: ${cand.name} (${newApp.applicationNumber})`,
+    'leave_submitted',
+    'delivered'
+  );
+
+  // Audit Log
+  dbManager.logAudit(
+    cand.email,
+    'candidate',
+    'LEAVE_APPLICATION_SUBMITTED',
+    'leave',
+    newApp.id,
+    `Candidate ${cand.name} (${cand.candidateId}) submitted leave application ${newApp.applicationNumber} (${startDate} to ${endDate}, ${totalDays} days).`
+  );
+
+  dbManager.save();
+  res.status(201).json({ application: newApp });
+});
+
+// 15. Candidate: Cancel Pending Leave Application
+apiRouter.put('/candidate/leave/:id/cancel', requireCandidate, (req: AuthenticatedRequest, res) => {
+  const db = dbManager.get();
+  const cand = req.user as CandidateUser;
+  const app = db.leaveApplications.find((a) => a.id === req.params.id);
+
+  if (!app) {
+    res.status(404).json({ error: 'Leave application not found.' });
+    return;
+  }
+
+  // Security check: Candidate can ONLY cancel their own application
+  if (app.candidateId !== cand.id) {
+    res.status(403).json({ error: 'You are not authorized to cancel this application.' });
+    return;
+  }
+
+  // Only PENDING applications can be self-cancelled by candidate
+  if (app.status !== 'pending') {
+    res.status(400).json({
+      error: `Cannot cancel application with status "${app.status.toUpperCase()}". Only Pending applications can be self-cancelled.`,
+    });
+    return;
+  }
+
+  const { cancelReason } = req.body;
+  const now = new Date().toISOString();
+
+  app.status = 'cancelled';
+  app.updatedAt = now;
+
+  app.history.unshift({
+    id: `hist-${Date.now()}`,
+    status: 'cancelled',
+    changedBy: cand.email,
+    changedByRole: 'candidate',
+    reason: cancelReason ? cancelReason.trim() : 'Cancelled by candidate',
+    timestamp: now,
+  });
+
+  // Admin In-App Notification
+  db.notifications.unshift({
+    id: `notif-${Date.now()}-admin-leave-cancel`,
+    title: `Leave Cancelled by Candidate: ${cand.name}`,
+    message: `${cand.name} (${cand.candidateId}) cancelled pending leave application ${app.applicationNumber} (${app.startDate} to ${app.endDate}).`,
+    type: 'leave',
+    targetAudience: 'all',
+    relatedEntity: { type: 'leave', id: app.id },
+    createdAt: now,
+    read: false,
+  });
+
+  // Admin Email Notification
+  dbManager.queueEmail(
+    db.admin.email,
+    db.admin.name,
+    `Leave Application Cancelled: ${cand.name} (${app.applicationNumber})`,
+    'leave_cancelled',
+    'delivered'
+  );
+
+  // Audit Log
+  dbManager.logAudit(
+    cand.email,
+    'candidate',
+    'LEAVE_APPLICATION_CANCELLED',
+    'leave',
+    app.id,
+    `Candidate ${cand.name} (${cand.candidateId}) cancelled pending leave application ${app.applicationNumber}.`
+  );
+
+  dbManager.save();
+  res.json({ application: app });
+});
+
+// 16. Leave Reports & Analytics (Admin only)
+apiRouter.get('/leave/reports', requireAdmin, (req: AuthenticatedRequest, res) => {
+  const db = dbManager.get();
+  const allApps = db.leaveApplications;
+
+  // Breakdown by Leave Type
+  const byType: Record<string, { name: string; count: number; approvedDays: number; color: string }> = {};
+  for (const t of db.leaveTypes) {
+    byType[t.id] = { name: t.name, count: 0, approvedDays: 0, color: t.color || 'blue' };
+  }
+  for (const a of allApps) {
+    if (!byType[a.leaveTypeId]) {
+      byType[a.leaveTypeId] = { name: a.leaveTypeName, count: 0, approvedDays: 0, color: 'slate' };
+    }
+    byType[a.leaveTypeId].count++;
+    if (a.status === 'approved') {
+      byType[a.leaveTypeId].approvedDays += a.totalDays || 0;
+    }
+  }
+
+  // Breakdown by Status
+  const byStatus = {
+    pending: allApps.filter((a) => a.status === 'pending').length,
+    approved: allApps.filter((a) => a.status === 'approved').length,
+    rejected: allApps.filter((a) => a.status === 'rejected').length,
+    cancelled: allApps.filter((a) => a.status === 'cancelled').length,
+  };
+
+  // Breakdown by Batch
+  const byBatch: Record<string, { batchName: string; courseName: string; totalApps: number; approvedDays: number }> = {};
+  for (const b of db.batches) {
+    byBatch[b.id] = { batchName: b.name, courseName: b.courseName || '', totalApps: 0, approvedDays: 0 };
+  }
+  for (const a of allApps) {
+    if (byBatch[a.batchId]) {
+      byBatch[a.batchId].totalApps++;
+      if (a.status === 'approved') {
+        byBatch[a.batchId].approvedDays += a.totalDays || 0;
+      }
+    }
+  }
+
+  // Top candidates with leave
+  const candidateLeaveMap: Record<string, { candidateName: string; candidateCustomId: string; totalDays: number; appCount: number }> = {};
+  for (const a of allApps) {
+    if (a.status === 'approved') {
+      if (!candidateLeaveMap[a.candidateId]) {
+        candidateLeaveMap[a.candidateId] = {
+          candidateName: a.candidateName,
+          candidateCustomId: a.candidateCustomId,
+          totalDays: 0,
+          appCount: 0,
+        };
+      }
+      candidateLeaveMap[a.candidateId].totalDays += a.totalDays || 0;
+      candidateLeaveMap[a.candidateId].appCount++;
+    }
+  }
+
+  const topCandidates = Object.values(candidateLeaveMap)
+    .sort((a, b) => b.totalDays - a.totalDays)
+    .slice(0, 10);
+
+  res.json({
+    reports: {
+      totalApplications: allApps.length,
+      totalApprovedDays: allApps
+        .filter((a) => a.status === 'approved')
+        .reduce((sum, a) => sum + (a.totalDays || 0), 0),
+      byStatus,
+      byType: Object.values(byType),
+      byBatch: Object.values(byBatch).filter((b) => b.totalApps > 0),
+      topCandidates,
+    },
+  });
+});
+
+// ==========================================
+// 15. TUTOR PORTAL API MODULE
+// ==========================================
+
+// Helper to get fresh Tutor entity and assigned batch set
+function getTutorContext(tutorId: string) {
+  const db = dbManager.get();
+  const tut = db.tutors.find((t) => t.id === tutorId);
+  const assignedBatchIds = new Set(tut?.assignedBatchIds || []);
+
+  // If no specific batch assignments are set, default to batches of assigned courses
+  if (assignedBatchIds.size === 0 && tut?.assignedCourseIds && tut.assignedCourseIds.length > 0) {
+    for (const b of db.batches) {
+      if (tut.assignedCourseIds.includes(b.courseId)) {
+        assignedBatchIds.add(b.id);
+      }
+    }
+  }
+
+  // Also include batches where batch.tutorId === tutorId
+  for (const b of db.batches) {
+    if (b.tutorId === tutorId) {
+      assignedBatchIds.add(b.id);
+    }
+  }
+  return { db, tut, assignedBatchIds };
+}
+
+// 1. Tutor Dashboard: Real-time statistics derived strictly from actual assigned records
+apiRouter.get('/tutor/dashboard', requireTutor, (req: AuthenticatedRequest, res) => {
+  const { db, tut, assignedBatchIds } = getTutorContext(req.user!.id);
+  if (!tut) {
+    res.status(404).json({ error: 'Tutor account not found.' });
+    return;
+  }
+
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  // 1. Assigned Batches
+  const assignedBatches = db.batches.filter((b) => assignedBatchIds.has(b.id));
+
+  // 2. Candidates in assigned batches
+  const candidates = db.candidates.filter(
+    (c) => assignedBatchIds.has(c.currentBatchId) && c.status !== 'archived'
+  );
+
+  // 3. Meetings for this tutor or assigned batches
+  const meetings = db.meetingSessions.filter(
+    (m) => m.tutorId === tut.id || assignedBatchIds.has(m.batchId)
+  );
+
+  const upcomingMeetings = meetings
+    .filter((m) => m.status === 'scheduled' && m.date >= todayStr)
+    .sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime));
+
+  const completedMeetings = meetings.filter((m) => m.status === 'completed');
+
+  // 4. Pending/Unmarked Attendance Sessions (within past 7 days up to today)
+  const recentPastSessions = meetings.filter(
+    (m) => m.date <= todayStr && (m.status === 'completed' || m.status === 'scheduled')
+  );
+  const unmarkedSessions = recentPastSessions.filter((s) => {
+    const records = db.attendance.filter((a) => a.sessionId === s.id);
+    return records.length === 0;
+  });
+
+  // 5. Relevant Resources
+  const relevantResources = db.resources.filter((r) => {
+    if (r.status !== 'published') return false;
+    if (r.audience === 'all') return true;
+    if (r.audience === 'course' && tut.assignedCourseIds?.includes(r.courseId || '')) return true;
+    if (r.audience === 'batch' && assignedBatchIds.has(r.batchId || '')) return true;
+    return false;
+  });
+
+  // 6. Notifications for this tutor
+  const notifications = db.notifications.filter((n) => {
+    if (n.targetAudience === 'all') return true;
+    if (n.targetAudience === 'tutor' && (n.tutorId === tut.id || !n.tutorId)) return true;
+    if (n.targetAudience === 'batch' && assignedBatchIds.has(n.batchId || '')) return true;
+    if (n.targetAudience === 'course' && tut.assignedCourseIds?.includes(n.courseId || '')) return true;
+    return false;
+  });
+
+  const dashboardPayload = {
+    tutor: {
+      id: tut.id,
+      tutorId: tut.tutorId,
+      name: tut.name,
+      email: tut.email,
+      phone: tut.phone,
+      specialization: tut.specialization,
+      designation: tut.designation || 'Instructor',
+      avatarUrl: tut.avatarUrl || '',
+      permissions: tut.permissions || getDefaultTutorPermissions(),
+      status: tut.status,
+    },
+    counts: {
+      assignedBatches: assignedBatches.length,
+      totalCandidates: candidates.length,
+      upcomingMeetings: upcomingMeetings.length,
+      completedMeetings: completedMeetings.length,
+      unmarkedSessions: unmarkedSessions.length,
+      resourcesCount: relevantResources.length,
+      unreadNotifications: notifications.filter((n) => !n.read).length,
+    },
+    stats: {
+      assignedBatchesCount: assignedBatches.length,
+      totalCandidates: candidates.length,
+      upcomingMeetingsCount: upcomingMeetings.length,
+      completedMeetingsCount: completedMeetings.length,
+      pendingAttendanceCount: unmarkedSessions.length,
+      totalResourcesCount: relevantResources.length,
+    },
+    assignedBatches,
+    nextSession: upcomingMeetings[0] || null,
+    upcomingMeetings: upcomingMeetings.slice(0, 5),
+    recentMeetings: completedMeetings.slice(0, 5),
+    unmarkedSessions: unmarkedSessions.slice(0, 5),
+    recentResources: relevantResources.slice(0, 4),
+    recentNotifications: notifications.slice(0, 5),
+    notifications: notifications.slice(0, 5),
+  };
+
+  res.json({
+    dashboard: dashboardPayload,
+    ...dashboardPayload,
+  });
+});
+
+// 2. Tutor Batches: View assigned batches with candidate roster
+apiRouter.get('/tutor/batches', requireTutor, (req: AuthenticatedRequest, res) => {
+  const { db, assignedBatchIds } = getTutorContext(req.user!.id);
+  const batches = db.batches.filter((b) => assignedBatchIds.has(b.id));
+
+  const enriched = batches.map((b) => {
+    const roster = db.candidates.filter(
+      (c) => c.currentBatchId === b.id && c.status !== 'archived'
+    ).map((c) => ({
+      id: c.id,
+      candidateId: c.candidateId,
+      name: c.name,
+      email: c.email,
+      phone: c.phone,
+      enrollmentDate: c.enrollmentDate,
+      status: c.status,
+    }));
+
+    const meetingCount = db.meetingSessions.filter((m) => m.batchId === b.id).length;
+
+    return {
+      ...b,
+      candidateCount: roster.length,
+      roster,
+      meetingCount,
+    };
+  });
+
+  res.json({ batches: enriched });
+});
+
+// 3. Tutor Single Batch Details
+apiRouter.get('/tutor/batches/:id', requireTutor, (req: AuthenticatedRequest, res) => {
+  const { db, assignedBatchIds } = getTutorContext(req.user!.id);
+
+  if (!assignedBatchIds.has(req.params.id)) {
+    res.status(403).json({ error: 'You are not assigned to this batch.' });
+    return;
+  }
+
+  const batch = db.batches.find((b) => b.id === req.params.id);
+  if (!batch) {
+    res.status(404).json({ error: 'Batch not found.' });
+    return;
+  }
+
+  const roster = db.candidates.filter(
+    (c) => c.currentBatchId === batch.id && c.status !== 'archived'
+  ).map((c) => {
+    const attendanceRecords = db.attendance.filter((a) => a.candidateId === c.id);
+    const presentCount = attendanceRecords.filter((a) => a.status === 'present').length;
+    const lateCount = attendanceRecords.filter((a) => a.status === 'late').length;
+    const absentCount = attendanceRecords.filter((a) => a.status === 'absent').length;
+
+    return {
+      id: c.id,
+      candidateId: c.candidateId,
+      name: c.name,
+      email: c.email,
+      phone: c.phone,
+      enrollmentDate: c.enrollmentDate,
+      status: c.status,
+      attendanceStats: {
+        total: attendanceRecords.length,
+        presentCount,
+        lateCount,
+        absentCount,
+      },
+    };
+  });
+
+  const meetings = db.meetingSessions
+    .filter((m) => m.batchId === batch.id)
+    .sort((a, b) => (b.date + b.startTime).localeCompare(a.date + a.startTime));
+
+  const resources = db.resources.filter(
+    (r) => r.status === 'published' && (r.batchId === batch.id || (r.courseId === batch.courseId && r.audience === 'course'))
+  );
+
+  res.json({ batch, roster, meetings, resources });
+});
+
+// 4. Tutor Meetings
+apiRouter.get('/tutor/meetings', requireTutor, (req: AuthenticatedRequest, res) => {
+  const { db, tut, assignedBatchIds } = getTutorContext(req.user!.id);
+  const { batchId, status, date } = req.query;
+
+  let meetings = db.meetingSessions.filter(
+    (m) => m.tutorId === tut!.id || assignedBatchIds.has(m.batchId)
+  );
+
+  if (batchId && batchId !== 'all') {
+    meetings = meetings.filter((m) => m.batchId === batchId);
+  }
+  if (status && status !== 'all') {
+    meetings = meetings.filter((m) => m.status === status);
+  }
+  if (date) {
+    meetings = meetings.filter((m) => m.date === date);
+  }
+
+  meetings.sort((a, b) => (b.date + b.startTime).localeCompare(a.date + a.startTime));
+
+  const canViewLinks = tut?.permissions?.canViewMeetingLinks !== false;
+
+  // Mask meeting link if tutor lacks link visibility permission
+  const safeMeetings = meetings.map((m) => ({
+    ...m,
+    meetingUrl: canViewLinks ? m.meetingUrl : undefined,
+  }));
+
+  res.json({ meetings: safeMeetings });
+});
+
+// 5. Tutor Toggle Meeting Access (Only if Super Admin granted permission)
+apiRouter.put('/tutor/meetings/:id/access', requireTutor, (req: AuthenticatedRequest, res) => {
+  const { db, tut, assignedBatchIds } = getTutorContext(req.user!.id);
+
+  if (!tut?.permissions?.canManageMeetingAccess) {
+    res.status(403).json({
+      error: 'Meeting access control is restricted to Super Admin. You do not have permission to enable/disable meeting links.',
+    });
+    return;
+  }
+
+  const meeting = db.meetingSessions.find((m) => m.id === req.params.id);
+  if (!meeting) {
+    res.status(404).json({ error: 'Meeting not found.' });
+    return;
+  }
+
+  if (meeting.tutorId !== tut.id && !assignedBatchIds.has(meeting.batchId)) {
+    res.status(403).json({ error: 'You are not assigned to this meeting.' });
+    return;
+  }
+
+  const { accessStatus } = req.body;
+  if (!['enabled', 'disabled'].includes(accessStatus)) {
+    res.status(400).json({ error: 'accessStatus must be "enabled" or "disabled".' });
+    return;
+  }
+
+  meeting.accessStatus = accessStatus;
+  meeting.accessEnabledAt = accessStatus === 'enabled' ? new Date().toISOString() : undefined;
+
+  dbManager.logAudit(
+    tut.email,
+    'tutor',
+    'TUTOR_MEETING_ACCESS_CHANGED',
+    'meeting',
+    meeting.id,
+    `Tutor ${tut.name} set meeting access to ${accessStatus.toUpperCase()} for "${meeting.title}".`
+  );
+
+  dbManager.save();
+  res.json({ session: meeting });
+});
+
+// 6. Tutor Session Attendance Roster
+apiRouter.get('/tutor/attendance/session/:sessionId', requireTutor, (req: AuthenticatedRequest, res) => {
+  const { db, tut, assignedBatchIds } = getTutorContext(req.user!.id);
+
+  const session = db.meetingSessions.find((m) => m.id === req.params.sessionId);
+  if (!session) {
+    res.status(404).json({ error: 'Meeting session not found.' });
+    return;
+  }
+
+  if (session.tutorId !== tut!.id && !assignedBatchIds.has(session.batchId)) {
+    res.status(403).json({ error: 'You are not authorized for this meeting session.' });
+    return;
+  }
+
+  const candidates = db.candidates.filter(
+    (c) => c.currentBatchId === session.batchId && c.status !== 'archived'
+  );
+
+  const existingRecords = db.attendance.filter((a) => a.sessionId === session.id);
+  const recordsMap = new Map(existingRecords.map((r) => [r.candidateId, r]));
+
+  const roster = candidates.map((cand) => {
+    const existing = recordsMap.get(cand.id);
+    return {
+      candidateId: cand.id,
+      candidateCustomId: cand.candidateId,
+      name: cand.name,
+      email: cand.email,
+      phone: cand.phone,
+      status: existing ? existing.status : 'unmarked',
+      remarks: existing ? existing.remarks : '',
+      recordId: existing ? existing.id : null,
+      markedAt: existing ? existing.markedAt : null,
+      markedBy: existing ? existing.markedBy : null,
+    };
+  });
+
+  const present = existingRecords.filter((r) => r.status === 'present').length;
+  const absent = existingRecords.filter((r) => r.status === 'absent').length;
+  const late = existingRecords.filter((r) => r.status === 'late').length;
+  const excused = existingRecords.filter((r) => r.status === 'excused').length;
+  const unmarked = Math.max(0, candidates.length - existingRecords.length);
+
+  const windowHours = tut?.permissions?.attendanceEditWindowHours || 48;
+  const meetingDateObj = new Date(`${session.date}T${session.endTime || '23:59'}`);
+  const hoursSinceSession = (Date.now() - meetingDateObj.getTime()) / (1000 * 60 * 60);
+  const isWindowExpired = hoursSinceSession > windowHours;
+
+  res.json({
+    session,
+    batch: db.batches.find((b) => b.id === session.batchId) || null,
+    roster,
+    attendance: existingRecords,
+    summary: {
+      total: candidates.length,
+      present,
+      absent,
+      late,
+      excused,
+      unmarked,
+    },
+    canRecordAttendance: !!tut?.permissions?.canRecordAttendance,
+    canEditAttendance: !!tut?.permissions?.canEditAttendance,
+    isWindowExpired,
+    windowHours,
+    permissions: {
+      canRecordAttendance: !!tut?.permissions?.canRecordAttendance,
+      canEditAttendance: !!tut?.permissions?.canEditAttendance,
+      attendanceEditWindowHours: windowHours,
+    },
+  });
+});
+
+// 7. Tutor Mark Attendance
+apiRouter.post('/tutor/attendance/mark', requireTutor, (req: AuthenticatedRequest, res) => {
+  const { db, tut, assignedBatchIds } = getTutorContext(req.user!.id);
+
+  if (!tut?.permissions?.canRecordAttendance) {
+    res.status(403).json({
+      error: 'Attendance recording permission is not enabled for your account by Super Admin.',
+    });
+    return;
+  }
+
+  const { sessionId, records } = req.body;
+  if (!sessionId || !Array.isArray(records)) {
+    res.status(400).json({ error: 'sessionId and records array are required.' });
+    return;
+  }
+
+  const session = db.meetingSessions.find((m) => m.id === sessionId);
+  if (!session) {
+    res.status(404).json({ error: 'Meeting session not found.' });
+    return;
+  }
+
+  if (session.tutorId !== tut.id && !assignedBatchIds.has(session.batchId)) {
+    res.status(403).json({ error: 'You are not authorized to mark attendance for this session.' });
+    return;
+  }
+
+  const now = new Date().toISOString();
+  let markedCount = 0;
+  const markedRecords: any[] = [];
+
+  for (const item of records) {
+    if (!item.candidateId || !item.status) continue;
+    const existingIndex = db.attendance.findIndex(
+      (a) => a.sessionId === sessionId && a.candidateId === item.candidateId
+    );
+
+    const cand = db.candidates.find((c) => c.id === item.candidateId);
+
+    if (existingIndex !== -1) {
+      // If already marked, check if tutor has edit permission
+      if (!tut.permissions?.canEditAttendance) {
+        continue;
+      }
+      db.attendance[existingIndex].status = item.status;
+      db.attendance[existingIndex].remarks = item.remarks || '';
+      db.attendance[existingIndex].updatedAt = now;
+      db.attendance[existingIndex].markedBy = tut.name;
+      markedRecords.push(db.attendance[existingIndex]);
+    } else {
+      const newRec = {
+        id: `att-${Date.now()}-${item.candidateId}`,
+        sessionId,
+        sessionTitle: session.title,
+        sessionDate: session.date,
+        candidateId: item.candidateId,
+        candidateName: cand?.name,
+        candidateCustomId: cand?.candidateId,
+        status: item.status,
+        remarks: item.remarks || '',
+        markedAt: now,
+        markedBy: tut.name,
+      };
+      db.attendance.push(newRec);
+      markedRecords.push(newRec);
+      markedCount++;
+    }
+  }
+
+  dbManager.logAudit(
+    tut.email,
+    'tutor',
+    'TUTOR_ATTENDANCE_MARKED',
+    'attendance',
+    sessionId,
+    `Tutor ${tut.name} marked roll call for session "${session.title}" (${session.date}).`
+  );
+
+  dbManager.save();
+  res.json({ success: true, count: markedCount, markedCount, records: markedRecords });
+});
+
+// 8. Tutor Correct Attendance (Subject to Allowed Edit Window)
+apiRouter.put('/tutor/attendance/:id/correct', requireTutor, (req: AuthenticatedRequest, res) => {
+  const { db, tut, assignedBatchIds } = getTutorContext(req.user!.id);
+
+  if (!tut?.permissions?.canEditAttendance) {
+    res.status(403).json({
+      error: 'Attendance modification permission is not enabled for your account by Super Admin.',
+    });
+    return;
+  }
+
+  const record = db.attendance.find((a) => a.id === req.params.id);
+  if (!record) {
+    res.status(404).json({ error: 'Attendance record not found.' });
+    return;
+  }
+
+  const session = db.meetingSessions.find((m) => m.id === record.sessionId);
+  if (!session || (session.tutorId !== tut.id && !assignedBatchIds.has(session.batchId))) {
+    res.status(403).json({ error: 'You are not authorized for this session.' });
+    return;
+  }
+
+  const { status, remarks, correctionReason } = req.body;
+  if (!correctionReason || !correctionReason.trim()) {
+    res.status(400).json({ error: 'A mandatory correction reason is required.' });
+    return;
+  }
+
+  // Check editing period window constraint
+  const windowHours = tut.permissions?.attendanceEditWindowHours || 48;
+  const sessionTime = new Date(`${session.date}T${session.startTime || '00:00'}`).getTime();
+  const diffHours = (Date.now() - sessionTime) / (1000 * 60 * 60);
+
+  if (diffHours > windowHours) {
+    res.status(400).json({
+      error: `The allowed attendance modification period (${windowHours} hours) has expired for this session. Please contact Super Admin for historical corrections.`,
+    });
+    return;
+  }
+
+  record.status = status;
+  record.remarks = remarks !== undefined ? remarks : record.remarks;
+  record.correctionReason = correctionReason.trim();
+  record.updatedAt = new Date().toISOString();
+  record.markedBy = `${tut.name} (corrected)`;
+
+  dbManager.logAudit(
+    tut.email,
+    'tutor',
+    'TUTOR_ATTENDANCE_CORRECTED',
+    'attendance',
+    record.id,
+    `Tutor ${tut.name} corrected attendance for ${record.candidateName}. Reason: ${correctionReason.trim()}`
+  );
+
+  dbManager.save();
+  res.json({ record });
+});
+
+// 9. Tutor Learning Resources
+apiRouter.get('/tutor/resources', requireTutor, (req: AuthenticatedRequest, res) => {
+  const { db, tut, assignedBatchIds } = getTutorContext(req.user!.id);
+  const { category, batchId } = req.query;
+
+  let resources = db.resources.filter((r) => {
+    if (r.status !== 'published') return false;
+    if (r.audience === 'all') return true;
+    if (r.audience === 'course' && tut!.assignedCourseIds?.includes(r.courseId || '')) return true;
+    if (r.audience === 'batch' && assignedBatchIds.has(r.batchId || '')) return true;
+    return false;
+  });
+
+  if (category && category !== 'all') {
+    resources = resources.filter((r) => r.category === category);
+  }
+  if (batchId && batchId !== 'all') {
+    resources = resources.filter((r) => r.batchId === batchId);
+  }
+
+  res.json({
+    resources,
+    permissions: {
+      canUploadResources: !!tut?.permissions?.canUploadResources,
+      canManageOwnResources: !!tut?.permissions?.canManageOwnResources,
+    },
+  });
+});
+
+// 10. Tutor Upload Learning Resource
+apiRouter.post('/tutor/resources', requireTutor, (req: AuthenticatedRequest, res) => {
+  const { db, tut, assignedBatchIds } = getTutorContext(req.user!.id);
+
+  if (!tut?.permissions?.canUploadResources) {
+    res.status(403).json({
+      error: 'Resource upload permission is not enabled for your account by Super Admin.',
+    });
+    return;
+  }
+
+  const { title, description, category, type, url, fileName, fileSize, mimeType, courseId, batchId, audience } = req.body;
+  if (!title || !url || !category) {
+    res.status(400).json({ error: 'Title, category, and document URL are required.' });
+    return;
+  }
+
+  // Validate audience assignment
+  if (batchId && !assignedBatchIds.has(batchId)) {
+    res.status(403).json({ error: 'You can only upload resources to your assigned batches.' });
+    return;
+  }
+  if (courseId && !tut.assignedCourseIds?.includes(courseId)) {
+    res.status(403).json({ error: 'You can only upload resources to your assigned courses.' });
+    return;
+  }
+
+  const course = db.courses.find((c) => c.id === courseId);
+  const batch = db.batches.find((b) => b.id === batchId);
+
+  const resource: ResourceItem = {
+    id: `res-${Date.now()}`,
+    title: title.trim(),
+    description: description ? description.trim() : '',
+    category,
+    type: type || 'file',
+    url: url.trim(),
+    fileName,
+    fileSize,
+    mimeType,
+    courseId,
+    courseName: course?.name,
+    batchId,
+    batchName: batch?.name,
+    audience: audience || (batchId ? 'batch' : courseId ? 'course' : 'all'),
+    status: 'published',
+    uploadedBy: tut.name,
+    createdAt: new Date().toISOString(),
+  };
+
+  db.resources.unshift(resource);
+
+  dbManager.logAudit(
+    tut.email,
+    'tutor',
+    'TUTOR_RESOURCE_UPLOADED',
+    'resource',
+    resource.id,
+    `Tutor ${tut.name} uploaded learning material "${resource.title}".`
+  );
+
+  dbManager.save();
+  res.status(201).json({ resource });
+});
+
+// 11. Tutor Delete Own Resource
+apiRouter.delete('/tutor/resources/:id', requireTutor, (req: AuthenticatedRequest, res) => {
+  const { db, tut } = getTutorContext(req.user!.id);
+
+  if (!tut?.permissions?.canManageOwnResources) {
+    res.status(403).json({
+      error: 'Resource deletion permission is not enabled for your account by Super Admin.',
+    });
+    return;
+  }
+
+  const index = db.resources.findIndex((r) => r.id === req.params.id);
+  if (index === -1) {
+    res.status(404).json({ error: 'Resource not found.' });
+    return;
+  }
+
+  const resource = db.resources[index];
+  // Security restriction: Tutors can never delete Super Admin resources
+  if (resource.uploadedBy !== tut.name && resource.uploadedBy !== tut.id) {
+    res.status(403).json({
+      error: 'You are only authorized to delete learning resources uploaded by yourself.',
+    });
+    return;
+  }
+
+  db.resources.splice(index, 1);
+  dbManager.logAudit(
+    tut.email,
+    'tutor',
+    'TUTOR_RESOURCE_DELETED',
+    'resource',
+    resource.id,
+    `Tutor ${tut.name} removed own resource "${resource.title}".`
+  );
+
+  dbManager.save();
+  res.json({ success: true, message: 'Resource removed successfully.' });
+});
+
+// 12. Tutor Notifications
+apiRouter.get('/tutor/notifications', requireTutor, (req: AuthenticatedRequest, res) => {
+  const { db, tut, assignedBatchIds } = getTutorContext(req.user!.id);
+
+  const notifications = db.notifications.filter((n) => {
+    if (n.targetAudience === 'all') return true;
+    if (n.targetAudience === 'tutor' && (n.tutorId === tut!.id || !n.tutorId)) return true;
+    if (n.targetAudience === 'batch' && assignedBatchIds.has(n.batchId || '')) return true;
+    if (n.targetAudience === 'course' && tut!.assignedCourseIds?.includes(n.courseId || '')) return true;
+    return false;
+  });
+
+  res.json({ notifications });
+});
+
+apiRouter.put('/tutor/notifications/:id/read', requireTutor, (req: AuthenticatedRequest, res) => {
+  const db = dbManager.get();
+  const notif = db.notifications.find((n) => n.id === req.params.id);
+  if (notif) {
+    notif.read = true;
+    dbManager.save();
+  }
+  res.json({ success: true });
+});
+
+apiRouter.put('/tutor/notifications/read-all', requireTutor, (req: AuthenticatedRequest, res) => {
+  const { db, tut, assignedBatchIds } = getTutorContext(req.user!.id);
+  db.notifications.forEach((n) => {
+    if (
+      n.targetAudience === 'all' ||
+      (n.targetAudience === 'tutor' && (n.tutorId === tut!.id || !n.tutorId)) ||
+      (n.targetAudience === 'batch' && assignedBatchIds.has(n.batchId || '')) ||
+      (n.targetAudience === 'course' && tut!.assignedCourseIds?.includes(n.courseId || ''))
+    ) {
+      n.read = true;
+    }
+  });
+  dbManager.save();
+  res.json({ success: true });
+});
+
+// 13. Tutor Profile View & Update
+apiRouter.get('/tutor/profile', requireTutor, (req: AuthenticatedRequest, res) => {
+  const { tut } = getTutorContext(req.user!.id);
+  if (!tut) {
+    res.status(404).json({ error: 'Tutor account not found.' });
+    return;
+  }
+  res.json({ profile: tut, tutor: tut });
+});
+
+apiRouter.put('/tutor/profile', requireTutor, (req: AuthenticatedRequest, res) => {
+  const { db, tut } = getTutorContext(req.user!.id);
+  if (!tut) {
+    res.status(404).json({ error: 'Tutor account not found.' });
+    return;
+  }
+
+  const { phone, specialization, designation, avatarUrl } = req.body;
+  if (phone !== undefined) tut.phone = String(phone).trim();
+  if (specialization !== undefined) tut.specialization = String(specialization).trim();
+  if (designation !== undefined) tut.designation = String(designation).trim();
+  if (avatarUrl !== undefined) tut.avatarUrl = String(avatarUrl).trim();
+
+  dbManager.logAudit(
+    tut.email,
+    'tutor',
+    'TUTOR_PROFILE_UPDATED',
+    'tutor',
+    tut.id,
+    `Tutor ${tut.name} updated their personal profile settings.`
+  );
+
+  dbManager.save();
+  res.json({ profile: tut, tutor: tut });
+});
+
+// 14. Tutor Leave Management Module
+apiRouter.get('/tutor/leave', requireTutor, (req: AuthenticatedRequest, res) => {
+  const db = dbManager.get();
+  const tutorId = req.user!.id;
+  const tutorEmail = req.user!.email;
+
+  // Strict ownership isolation: ONLY return current tutor's leave applications
+  const myApps = db.leaveApplications.filter(
+    (a) =>
+      a.applicantRole === 'tutor' &&
+      (a.candidateId === tutorId || a.tutorId === tutorId || a.candidateEmail === tutorEmail)
+  );
+
+  // Sort descending by appliedAt
+  myApps.sort((a, b) => new Date(b.appliedAt).getTime() - new Date(a.appliedAt).getTime());
+
+  const summary = {
+    total: myApps.length,
+    pending: myApps.filter((a) => a.status === 'pending').length,
+    approved: myApps.filter((a) => a.status === 'approved').length,
+    rejected: myApps.filter((a) => a.status === 'rejected').length,
+    cancelled: myApps.filter((a) => a.status === 'cancelled').length,
+    totalApprovedDays: myApps
+      .filter((a) => a.status === 'approved')
+      .reduce((sum, a) => sum + (a.totalDays || 0), 0),
+  };
+
+  res.json({ applications: myApps, summary });
+});
+
+apiRouter.post('/tutor/leave', requireTutor, (req: AuthenticatedRequest, res) => {
+  const { db, tut } = getTutorContext(req.user!.id);
+  if (!tut) {
+    res.status(404).json({ error: 'Tutor account not found.' });
+    return;
+  }
+
+  if (tut.status === 'inactive') {
+    res.status(403).json({ error: 'Your tutor account is inactive. Please contact administration.' });
+    return;
+  }
+
+  const { leaveTypeId, startDate, endDate, reason, attachments } = req.body;
+
+  if (!leaveTypeId) {
+    res.status(400).json({ error: 'Please select a leave type.' });
+    return;
+  }
+  if (!reason || !reason.trim()) {
+    res.status(400).json({ error: 'Please enter the reason for your leave application.' });
+    return;
+  }
+
+  const leaveType = db.leaveTypes.find((t) => t.id === leaveTypeId);
+  if (!leaveType) {
+    res.status(400).json({ error: 'Selected leave type was not found.' });
+    return;
+  }
+  if (!leaveType.isActive) {
+    res.status(400).json({ error: `The leave type "${leaveType.name}" is currently inactive.` });
+    return;
+  }
+
+  // Date validity and retrospective check
+  const dateValidation = validateLeaveDates(
+    startDate,
+    endDate,
+    db.leavePolicy,
+    db.settings.companyTimezone || 'Asia/Kolkata'
+  );
+  if (!dateValidation.isValid) {
+    res.status(400).json({ error: dateValidation.error });
+    return;
+  }
+
+  // Calculate total leave days
+  const totalDays = calculateLeaveDays(startDate, endDate, db.leavePolicy.calculationMode || 'working_days');
+  if (totalDays <= 0) {
+    res.status(400).json({
+      error: `The selected date range (${startDate} to ${endDate}) yields 0 days under the current company policy (${
+        db.leavePolicy.calculationMode === 'working_days' ? 'working days excluding weekends' : 'calendar days'
+      }).`,
+    });
+    return;
+  }
+
+  // Overlap check with tutor's existing pending or approved applications
+  const tutorExistingApps = db.leaveApplications.filter(
+    (a) =>
+      a.applicantRole === 'tutor' &&
+      (a.candidateId === tut.id || a.tutorId === tut.id || a.candidateEmail === tut.email)
+  );
+  const overlapCheck = checkLeaveOverlap(startDate, endDate, tutorExistingApps);
+  if (overlapCheck.hasOverlap && overlapCheck.overlappingApp) {
+    const opp = overlapCheck.overlappingApp;
+    res.status(400).json({
+      error: `Overlapping leave request detected: You already have a ${opp.status.toUpperCase()} leave application (${opp.applicationNumber} from ${opp.startDate} to ${opp.endDate}) during this period.`,
+    });
+    return;
+  }
+
+  // Supporting document requirement
+  const sanitizedAttachments: any[] = Array.isArray(attachments) ? attachments : [];
+  if (leaveType.requiresDocument && sanitizedAttachments.length === 0) {
+    res.status(400).json({
+      error: `Supporting documentation is mandatory for "${leaveType.name}". Please attach supporting documents.`,
+    });
+    return;
+  }
+  if (
+    db.leavePolicy.requireAttachmentAboveDays > 0 &&
+    totalDays > db.leavePolicy.requireAttachmentAboveDays &&
+    sanitizedAttachments.length === 0
+  ) {
+    res.status(400).json({
+      error: `Company policy requires a supporting document for leave requests exceeding ${db.leavePolicy.requireAttachmentAboveDays} days.`,
+    });
+    return;
+  }
+
+  const applicationNumber = generateApplicationNumber(db.leaveApplications);
+  const now = new Date().toISOString();
+
+  const newApp: LeaveApplication = {
+    id: `leave-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+    applicationNumber,
+    applicantRole: 'tutor',
+    candidateId: tut.id,
+    candidateCustomId: tut.tutorId,
+    candidateName: tut.name,
+    candidateEmail: tut.email,
+    tutorId: tut.id,
+    tutorCustomId: tut.tutorId,
+    courseId: (tut.assignedCourseIds && tut.assignedCourseIds[0]) || '',
+    courseName: tut.assignedCourseNames && tut.assignedCourseNames.length > 0 ? tut.assignedCourseNames.join(', ') : 'Assigned Courses',
+    batchId: (tut.assignedBatchIds && tut.assignedBatchIds[0]) || '',
+    batchName: tut.assignedBatchNames && tut.assignedBatchNames.length > 0 ? tut.assignedBatchNames.join(', ') : 'Assigned Batches',
+    leaveTypeId: leaveType.id,
+    leaveTypeName: leaveType.name,
+    startDate,
+    endDate,
+    totalDays,
+    reason: reason.trim(),
+    status: 'pending',
+    attachments: sanitizedAttachments.map((att: any) => ({
+      id: att.id || `att-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      fileName: att.fileName || 'document',
+      fileSize: Number(att.fileSize) || 0,
+      mimeType: att.mimeType || 'application/octet-stream',
+      dataUrl: att.dataUrl || '',
+      uploadedAt: now,
+    })),
+    history: [
+      {
+        id: `hist-${Date.now()}`,
+        status: 'pending',
+        changedBy: tut.email,
+        changedByRole: 'tutor',
+        reason: 'Application submitted by instructor',
+        timestamp: now,
+      },
+    ],
+    appliedAt: now,
+    updatedAt: now,
+  };
+
+  db.leaveApplications.unshift(newApp);
+
+  // In-app Notification for Super Admin
+  db.notifications.unshift({
+    id: `notif-${Date.now()}-admin-tutor-leave`,
+    title: `New Instructor Leave Application: ${tut.name}`,
+    message: `Instructor ${tut.name} (${tut.tutorId}) submitted a ${leaveType.name} application for ${startDate} to ${endDate} (${totalDays} day(s)).`,
+    type: 'leave',
+    targetAudience: 'all',
+    relatedEntity: { type: 'leave', id: newApp.id },
+    createdAt: now,
+    read: false,
+  });
+
+  // Email Notification to Super Admin
+  dbManager.queueEmail(
+    db.admin.email,
+    db.admin.name,
+    `New Instructor Leave Application: ${tut.name} (${newApp.applicationNumber})`,
+    'leave_submitted',
+    'delivered'
+  );
+
+  // Audit Log
+  dbManager.logAudit(
+    tut.email,
+    'tutor',
+    'TUTOR_LEAVE_APPLIED',
+    'leave',
+    newApp.id,
+    `Instructor ${tut.name} (${tut.tutorId}) submitted leave application ${newApp.applicationNumber} (${startDate} to ${endDate}, ${totalDays} days).`
+  );
+
+  dbManager.save();
+  res.status(201).json({ application: newApp });
+});
+
+apiRouter.put('/tutor/leave/:id/cancel', requireTutor, (req: AuthenticatedRequest, res) => {
+  const db = dbManager.get();
+  const tutorId = req.user!.id;
+  const tutorEmail = req.user!.email;
+  const app = db.leaveApplications.find((a) => a.id === req.params.id);
+
+  if (!app) {
+    res.status(404).json({ error: 'Leave application not found.' });
+    return;
+  }
+
+  // Security check: Tutor can ONLY cancel their own application
+  if (app.applicantRole !== 'tutor' || (app.candidateId !== tutorId && app.tutorId !== tutorId && app.candidateEmail !== tutorEmail)) {
+    res.status(403).json({ error: 'You are not authorized to cancel this application.' });
+    return;
+  }
+
+  // Only PENDING applications can be self-cancelled
+  if (app.status !== 'pending') {
+    res.status(400).json({
+      error: `Cannot cancel application with status "${app.status.toUpperCase()}". Only Pending applications can be self-cancelled.`,
+    });
+    return;
+  }
+
+  const { cancelReason } = req.body;
+  const now = new Date().toISOString();
+
+  app.status = 'cancelled';
+  app.updatedAt = now;
+
+  app.history.unshift({
+    id: `hist-${Date.now()}`,
+    status: 'cancelled',
+    changedBy: tutorEmail,
+    changedByRole: 'tutor',
+    reason: cancelReason ? cancelReason.trim() : 'Cancelled by instructor',
+    timestamp: now,
+  });
+
+  // Notify Super Admin
+  db.notifications.unshift({
+    id: `notif-${Date.now()}-admin-tutor-leave-cancelled`,
+    title: `Instructor Leave Cancelled: ${app.candidateName}`,
+    message: `Instructor ${app.candidateName} (${app.tutorCustomId || app.candidateCustomId}) cancelled their leave request ${app.applicationNumber}.${
+      cancelReason ? ` Reason: ${cancelReason.trim()}` : ''
+    }`,
+    type: 'leave',
+    targetAudience: 'all',
+    relatedEntity: { type: 'leave', id: app.id },
+    createdAt: now,
+    read: false,
+  });
+
+  // Audit Log
+  dbManager.logAudit(
+    tutorEmail,
+    'tutor',
+    'TUTOR_LEAVE_CANCELLED',
+    'leave',
+    app.id,
+    `Instructor ${app.candidateName} cancelled leave application ${app.applicationNumber}.`
+  );
+
+  dbManager.save();
+  res.json({ application: app });
+});
+
+
+

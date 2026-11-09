@@ -24,7 +24,11 @@ export const Header: React.FC<HeaderProps> = ({ currentTab }) => {
             Kodewar LMS
           </span>
           <span className="text-[11px] text-slate-500 dark:text-slate-400 font-normal">
-            {user?.role === 'admin' ? 'Super Admin Portal' : 'Candidate Learning Portal'}
+            {user?.role === 'admin'
+              ? 'Super Admin Portal'
+              : user?.role === 'tutor'
+              ? 'Instructor & Tutor Portal'
+              : 'Candidate Learning Portal'}
           </span>
         </div>
       </div>
@@ -40,6 +44,12 @@ export const Header: React.FC<HeaderProps> = ({ currentTab }) => {
           <>
             <span aria-hidden="true">·</span>
             <span className="text-slate-600 dark:text-slate-300">{(user as any).batchName}</span>
+          </>
+        )}
+        {user?.role === 'tutor' && (user as any).designation && (
+          <>
+            <span aria-hidden="true">·</span>
+            <span className="text-slate-600 dark:text-slate-300">{(user as any).designation}</span>
           </>
         )}
       </div>
